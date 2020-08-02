@@ -1,0 +1,76 @@
+.TH xdg-xmenu 1 "July 2020" git
+.SH NAME
+xdg-xmenu - generate an XDG desktop menu file for
+.IR xmenu (1)
+.SH SYNOPSIS
+[ \fIENVIRONMENT_VARIABLES\fR ]
+.B xdg-xmenu
+.SH DESCRIPTION
+xdg-xmenu is a shell script to generate an XDG desktop menu file for xmenu.
+.P
+.B Desktop Files: 
+The script will go through the .desktop files in the following directories:
+$XDG_DATA_DIRS/applications, $XDG_DATA_HOME/applications.
+.P
+.B Icon Files:
+xdg-xmenu will find the icons in the following directories (loosely \
+following the method in the freedesktop.org specification):
+$XDG_DATA_DIRS/icons, $XDG_DATA_HOME/icons.
+.SH Output
+.B Images:
+Since
+.IR xmenu (1)
+does not support svg format as icons, this script will convert the found svg
+files to png images and cache them in $XDG_CACHE_HOME/xdg-xmenu/.
+By default, png and xpm icons will be copied to the cache folder.
+.P
+.B Menu:
+The script will output the menu that can be used by
+.IR xmenu (1)
+in stdout. You can run this command to use it:
+.P
+xdg-menu > menu; xmenu < menu | sh &
+.P
+It's not recommended to pipe the output to xmenu due to the speed.
+.SH DEPENDENCIES
+If you need to convert svg icons to png images, at least one of the
+following commands is needed:
+.TP
+.IR rsvg-convert (1)
+This command is provided by librsvg and is the fastest one.
+Thus it will be used if available.
+.TP
+.IR convert (1)
+This command is provided by
+.IR ImageMagick (1)
+.TP
+.IR inkscape (1)
+.SH ENVIRONMENT
+The configurations of this script is mostly controlled by environment variables.
+.TP
+.BR TERMINAL
+Terminal emulator to use.
+Default is xterm if not specified.
+.TP
+.BR ICON_SIZE
+Icon size (should match the sizes in icon theme folders).
+Default is 24 if not specified.
+.TP
+.BR ICON_THEME
+Icon theme (as in the icon folder name).
+Default is gtk3 settings if not specified.
+.TP
+.BR FALLBACK_ICON
+Fallback icon in case one can not be found.
+Both an icon name and a file path is acceptable.
+Default is application-x-executable.
+.SH SEE ALSO
+.IR xmenu (1),
+.IR rsvg-convert (1)
+.IR convert (1)
+.IR inkscape (1)
+.SH BUGS
+The implementation does not cover everything in the freedesktop specifications,
+so it is possible that a desktop entry is parsed incorrectly or an icon is not found.
+.P
+Report any bugs at https://github.com/OliverLew/xdg-xmenu/issues
