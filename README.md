@@ -12,36 +12,35 @@ If the icons found are svg images, which is very possible, you will need any one
 
 ## Usage
 
-The script can be simply invoked with
+```
+xdg-xmenu [-a] [-b fallback_font] [-i icon_theme] [-s icon_size] [-t terminal]
 
-```sh
-$ xdg-xmenu > menu
+Options
+  -a  Show icons with `OnlyShowIn' key in .desktop file.  These desktop entries are
+      usually programs specifically for desktop environments.  Default is now show‐
+      ing those desktop entries.
+
+  -b fallback_icon
+      Fallback  icon  in  case  one can not be found.  Both an icon name and a file
+      path is acceptable.  Default is application-x-executable.
+
+  -i icon_theme
+      Icon theme.  Default is parsed from gtk3 configuration file if not specified.
+
+  -s icon_size
+      Icon size.  Default is 24 if not specified.
+
+  -t terminal
+      Terminal emulator to use.  Default is xterm if not specified.
 ```
 
-Then feed it to `xmenu` by
+To use it, you can redirect the output to a file and then feed it to `xmenu` by
 
 ```sh
-$ xmenu < menu | sh &
+$ xdg-xmenu > menu; xmenu < menu | sh &
 ```
 
 [xmenu-apps](xmenu-app) is an example script.
-
-The configurations of this script is controlled by environment variables.
-
-- **TERMINAL**:
-  Terminal emulator to use.  Default is xterm if not specified.
-
-- **ICON_SIZE**:
-  Icon  size  (should match the sizes in icon theme folders).  Default is 24 if
-  not specified.
-
-- **ICON_THEME**:
-  Icon theme (as in the icon folder name).  Default is  gtk3  settings  if  not
-  specified.
-
-- **FALLBACK_ICON**:
-  Fallback  icon  in  case  one can not be found.  Both an icon name and a file
-  path is acceptable.  Default is application-x-executable.
 
 ## Screenshot
 

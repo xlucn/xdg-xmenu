@@ -9,12 +9,24 @@ XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
 XDG_DATA_DIRS=${XDG_DATA_DIRS:-/usr/share:/usr/local/share}
 
 # Apply default configuration values
-SHOW_ALL=${SHOW_ALL:-}
-TERMINAL=${TERMINAL:-xterm}
-SIZE=${ICON_SIZE:-24}
-ICON_THEME=${ICON_THEME:-$(awk -F= '/gtk-icon-theme-name/{ print $2 }' \
-                           "$XDG_CONFIG_HOME/gtk-3.0/settings.ini")}
-FALLBACK_ICON=${FALLBACK_ICON:-application-x-executable}
+SHOW_ALL=
+TERMINAL=xterm
+SIZE=24
+ICON_THEME=$(awk -F= '/gtk-icon-theme-name/{ print $2 }' \
+            "$XDG_CONFIG_HOME/gtk-3.0/settings.ini")
+FALLBACK_ICON=application-x-executable
+
+# Read CLI arguments
+while getopts "ab:i:s:t:" arg; do
+    case "$arg" in
+        a) SHOW_ALL=1;;
+        b) FALLBACK_ICON=$OPTARG;;
+        i) ICON_THEME=$OPTARG;;
+        s) SIZE=$OPTARG;;
+        t) TERMINAL=$OPTARG;;
+        *) ;;
+    esac
+done
 
 # Directories
 DATA_DIRS=$XDG_DATA_HOME:$XDG_DATA_DIRS
