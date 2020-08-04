@@ -17,7 +17,7 @@ xdg-xmenu [-a] [-b fallback_font] [-i icon_theme] [-s icon_size] [-t terminal]
 
 Options
   -a  Show icons with `OnlyShowIn' key in .desktop file.  These desktop entries are
-      usually programs specifically for desktop environments.  Default is now show‐
+      usually programs specifically for desktop environments.  Default is not show‐
       ing those desktop entries.
 
   -b fallback_icon
@@ -25,13 +25,13 @@ Options
       path is acceptable.  Default is application-x-executable.
 
   -i icon_theme
-      Icon theme.  Default is parsed from gtk3 configuration file if not specified.
+      Icon theme.  Default is parsed from gtk3 configuration file.
 
   -s icon_size
-      Icon size.  Default is 24 if not specified.
+      Icon size.  Default is 24.
 
   -t terminal
-      Terminal emulator to use.  Default is xterm if not specified.
+      Terminal emulator to use.  Default is xterm.
 ```
 
 To use it, you can redirect the output to a file and then feed it to `xmenu` by

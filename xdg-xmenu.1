@@ -16,7 +16,7 @@ xdg-xmenu is a shell script to generate an XDG desktop menu file for xmenu.
 \fB\-a\fR
 Show icons with 'OnlyShowIn' key in .desktop file.
 These desktop entries are usually programs specifically for desktop environments.
-Default is now showing those desktop entries.
+Default is not showing those desktop entries.
 .TP
 \fB\-b \fIfallback_icon\fR
 Fallback icon in case one can not be found.
@@ -24,34 +24,33 @@ Both an icon name and a file path is acceptable.
 Default is application-x-executable.
 .TP
 \fB\-i \fIicon_theme\fR
-Icon theme.  Default is parsed from gtk3 configuration file if not specified.
+Icon theme. Default is parsed from gtk3 configuration file.
 .TP
 \fB\-s \fIicon_size\fR
-Icon size.  Default is 24 if not specified.
+Icon size. Default is 24 if not specified.
 .TP
 \fB\-t \fIterminal\fR
-Terminal emulator to use.
-Default is xterm if not specified.
+Terminal emulator to use. Default is xterm.
 .SH RESOURCES
 .TP
-.B Desktop Files: 
+.B Desktop Files
 The script will go through the .desktop files in the following directories:
 $XDG_DATA_DIRS/applications, $XDG_DATA_HOME/applications.
 .TP
-.B Icon Files:
+.B Icon Files
 xdg-xmenu will find the icons in the following directories (loosely \
 following the method in the freedesktop.org specification):
 $XDG_DATA_DIRS/icons, $XDG_DATA_HOME/icons.
 .SH Output
 .TP
-.B Images:
+.B Images
 Since
 .IR xmenu (1)
 does not support svg format as icons, this script will convert the found svg
 files to png images and cache them in $XDG_CACHE_HOME/xdg-xmenu/.
 By default, png and xpm icons will be copied to the cache folder.
 .TP
-.B Menu:
+.B Menu
 The script will output the menu that can be used by
 .IR xmenu (1)
 to stdout. You can run this command to use it:
