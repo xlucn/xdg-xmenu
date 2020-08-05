@@ -4,11 +4,13 @@
 
 ## Requirement
 
-If the icons found are svg images, which is very possible, you will need any one of the following convert tools (sorted by priority):
+The script will look for icons according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following convert tools (sorted by priority):
 
 - `rsvg-convert`: provided by `librsvg` package, it is the fastest one among the three.
 - `convert`: provided by `imagemagick` package.
 - `inkscape`: this is about as fast (or slow) as `convert`
+
+The svg icons will be converted to png images and be cached to `~/.cache/xdg-xmenu/icons` folder. As a result, the first time running this script might cost some time.
 
 ## Usage
 
