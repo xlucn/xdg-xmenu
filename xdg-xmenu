@@ -80,6 +80,7 @@ cache_icon() {
     cache_path="$CACHE_ICON_DIR/$icon_name.png"
     [ -f "$cache_path" ] && echo "$cache_path" && return
     icon_path=$(find_icon "$1")
+    [ ! -f "$icon_path" ] && return
     if [ "${icon_path##*.}" = "svg" ]; then
         if command -v rsvg-convert > /dev/null; then
             rsvg-convert -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
@@ -102,7 +103,6 @@ cache_icon() {
 }
 
 FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
-[ ! -f "$FALLBACK_ICON" ] && echo >&2 "fall back icon cannot be found" && exit 1
 
 IFS=:
 for datadir in $DATA_DIRS; do unset IFS
@@ -127,8 +127,9 @@ for datadir in $DATA_DIRS; do unset IFS
         [ -n "$nodisplay" ] && continue
         [ -n "$useterm" ]   && cmd="$TERMINAL -e $cmd"
         [ -n "$genname" ]   && name="$name ($genname)"
-        icon="IMG:${icon-$FALLBACK_ICON}"
-        item="\t$icon\t$name\t$cmd"
+        icon="${icon-$FALLBACK_ICON}"
+        [ -f "$icon" ]      && icon="\tIMG:$icon" || icon=
+        item="$icon\t$name\t$cmd"
 
         IFS=\;
         for c in $category; do unset IFS
