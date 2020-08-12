@@ -2,6 +2,8 @@
 
 `xdg-xmenu` is a small shell script to generate xdg desktop menu file for [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility.
 
+This script is only a toy project and I have not tested it outside of my own machine, so bugs are expected and feel free to report them here.
+
 ## Requirement
 
 The script will look for icons according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following convert tools (sorted by priority):
@@ -41,6 +43,8 @@ To use it, you can redirect the output to a file and then feed it to `xmenu` by
 ```sh
 $ xdg-xmenu > menu; xmenu < menu | sh &
 ```
+
+Piping directly to `xmenu` is not recommended due to the slow speed.
 
 [xmenu-apps](xmenu-app) is an example script.
 
