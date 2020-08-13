@@ -99,7 +99,7 @@ cache_icon() {
         [ "${icon_path##*.}" = "xpm" ] && cache_path="${cache_path%.*}.xpm"
         cp "$icon_path" "$cache_path"
     fi
-    echo "$cache_path"
+    [ -f "$cache_path" ] && echo "$cache_path"
 }
 
 FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
@@ -128,7 +128,7 @@ for datadir in $DATA_DIRS; do unset IFS
         [ -n "$useterm" ]   && cmd="$TERMINAL -e $cmd"
         [ -n "$genname" ]   && name="$name ($genname)"
         icon="${icon-$FALLBACK_ICON}"
-        [ -f "$icon" ]      && icon="\tIMG:$icon" || icon=
+        icon="${icon:+\tIMG:$icon}"
         item="$icon\t$name\t$cmd"
 
         IFS=\;
@@ -152,8 +152,9 @@ for datadir in $DATA_DIRS; do unset IFS
 done
 
 category_sort() { # $1: icon name, $2: category name, $3: items
-    printf "IMG:%s\t%s\n" "$(cache_icon "$1")" "$2"
-    printf "$3%s" "" | sort -f -k 2 | uniq
+    icon=$(cache_icon "$1")
+    printf "${icon:+IMG:$icon\t}%s\n" "$2"
+    printf "$3%s" | sort -f -k 2 | uniq
 }
 
 category_sort applications-accessories Accessories "$Accessories"
