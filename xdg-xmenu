@@ -76,7 +76,7 @@ find_icon() { # args: icon name
 }
 
 cache_icon() {
-    icon_name=${1#*/}; icon_name=${icon_name%.*}
+    icon_name=${1##*/}; icon_name=${icon_name%.*}
     cache_path="$CACHE_ICON_DIR/$icon_name.png"
     [ -f "$cache_path" ] && echo "$cache_path" && return
     icon_path=$(find_icon "$1")
