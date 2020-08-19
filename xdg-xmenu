@@ -102,7 +102,7 @@ cache_icon() {
     [ -f "$cache_path" ] && echo "$cache_path"
 }
 
-FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
+FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON") || exit
 
 IFS=:
 for datadir in $DATA_DIRS; do unset IFS
@@ -113,7 +113,7 @@ for datadir in $DATA_DIRS; do unset IFS
         while IFS="=" read -r key value; do
             case "$key" in
             Categories) [ -z "$category" ] && category=$value ;;
-            Icon) [ -z "$icon" ] && icon=$(cache_icon "$value") ;;
+            Icon) [ -z "$icon" ] && { icon=$(cache_icon "$value") || exit; } ;;
             Name) [ -z "$name" ] && name="$value" ;;
             GenericName) [ -z "$genname" ] && genname=$value ;;
             Exec) [ -z "$cmd" ] && cmd=$value && [ "${cmd#*%}" != "$cmd" ] &&
@@ -152,7 +152,7 @@ for datadir in $DATA_DIRS; do unset IFS
 done
 
 category_sort() { # $1: icon name, $2: category name, $3: items
-    icon=$(cache_icon "$1")
+    icon=$(cache_icon "$1") || exit
     printf "${icon:+IMG:$icon\t}%s\n" "$2"
     printf "$3%s" | sort -f -k 2 | uniq
 }
