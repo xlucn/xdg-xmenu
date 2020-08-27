@@ -48,6 +48,15 @@ Piping directly to `xmenu` is not recommended due to the slow speed.
 
 [xmenu-apps](xmenu-app) is an example script.
 
+### Configuration
+
+The command line options can also be replaced with environment variables:
+- `XDG_MENU_FALLBACK_ICON`: set fallback icon
+- `XDG_MENU_ICON_SIZE`: set icon size
+- `XDG_MENU_ICON_THEME`: set icon theme
+- `XDG_MENU_SHOW_ALL`: show 'OnlyShowIn' apps
+- `XDG_MENU_TERMINAL`: set terminal emulator
+
 ## Screenshot
 
 <img src="demo.gif" width="480px">
