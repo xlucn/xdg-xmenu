@@ -17,7 +17,7 @@ The svg icons will be converted to png images and be cached to `~/.cache/xdg-xme
 ## Usage
 
 ```
-xdg-xmenu [-a] [-b fallback_font] [-i icon_theme] [-s icon_size] [-t terminal]
+xdg-xmenu [-a] [-b fallback_icon] [-i icon_theme] [-s icon_size] [-t terminal]
 
 Options
   -a  Show icons with `OnlyShowIn' key in .desktop file.  These desktop entries are
