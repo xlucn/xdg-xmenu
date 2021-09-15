@@ -115,9 +115,7 @@ cache_icon() {
 
     # cache to $CACHE_ICON_DIR with the same name
     # ISSUE: degeneration of file names
-    icon_name=${icon##*/}
-    icon_name=${icon_name%.*}
-    cache_path="$CACHE_ICON_DIR/$icon_name.png"
+    cache_path="$CACHE_ICON_DIR/${icon##*/}.png"
 
     # already cached
     [ -f "$cache_path" ] && echo "$cache_path" && return
