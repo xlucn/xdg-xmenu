@@ -156,15 +156,18 @@ for datadir in $DATA_DIRS; do unset IFS
         while IFS="=" read -r key value; do
             case "$key" in
             Categories) [ -z "$category" ] && category=$value ;;
-            Icon) [ -z "$icon" ] && { icon=$(cache_icon "$value") || exit; } ;;
-            Name) [ -z "$name" ] && name="$value" ;;
-            GenericName) [ -z "$genname" ] && genname=$value ;;
-            Exec) [ -z "$cmd" ] && cmd=$value && [ "${cmd#*%}" != "$cmd" ] &&
-                cmd=$(echo "$cmd" | sed 's/ %[fFuUick]//g' | sed 's/%%/$/g') ;;
-            NoDisplay) [ "$value" != "false" ] && nodisplay=1 ;;
-            Terminal) [ "$value" != "false" ] && useterm=1 ;;
+            Icon)       [ -z "$icon" ]     && icon=$(cache_icon "$value") ;;
+            Name)       [ -z "$name" ]     && name="$value" ;;
+            GenericName)[ -z "$genname" ]  && genname=$value ;;
+            Exec)       [ -z "$cmd" ]      && cmd=$value &&
+                        # remove %* place holders
+                        [ "${cmd#*%}" != "$cmd" ] && cmd=$(
+                            echo "$cmd" | sed 's/ %[fFuUick]//g' | sed 's/%%/$/g'
+                        ) ;;
+            NoDisplay)  [ "$value" != "false" ] && nodisplay=1 ;;
+            Terminal)   [ "$value" != "false" ] && useterm=1 ;;
             # ISSUE: show_all not working as it should
-            OnlyShowIn) [ -z "$SHOW_ALL" ] && nodisplay=1 ;;
+            OnlyShowIn)     [ -z "$SHOW_ALL" ] && nodisplay=1 ;;
             esac
         done < "$app"
 
@@ -199,7 +202,7 @@ category_sort() {
     category_icon=$1
     category_name=$2
     category_apps=$3
-    icon=$(cache_icon "$category_icon") || exit
+    icon=$(cache_icon "$category_icon")
     # create top level folder
     printf "${icon:+IMG:$icon\t}%s\n" "$category_name"
     # sort the applications by their names
