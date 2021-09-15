@@ -72,7 +72,8 @@ find_icon() { # args: icon name
             [ -f "$dir/$1.$ext" ] && echo "$dir/$1.$ext" && return
         done
     done
-    echo "$FALLBACK_ICON"
+    # when the fallback icon is not found, return none instead
+    [ "$1" = "$FALLBACK_ICON" ] && echo "" || echo "$FALLBACK_ICON"
 }
 
 cache_icon() {
@@ -80,7 +81,6 @@ cache_icon() {
     cache_path="$CACHE_ICON_DIR/$icon_name.png"
     [ -f "$cache_path" ] && echo "$cache_path" && return
     icon_path=$(find_icon "$1")
-    [ ! -f "$icon_path" ] && return
     if [ "${icon_path##*.}" = "svg" ]; then
         if command -v rsvg-convert > /dev/null; then
             rsvg-convert -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
@@ -95,14 +95,15 @@ cache_icon() {
             echo >&2 "rsvg-convert(librsvg), convert(imagemagick), inkscape"
             exit 1
         fi
+        echo "$cache_path"
     else
-        [ "${icon_path##*.}" = "xpm" ] && cache_path="${cache_path%.*}.xpm"
-        cp "$icon_path" "$cache_path"
+        # use png and xpm icons in-place
+        # this could be empty if no fallback icon is found, and it will work
+        echo "$icon_path"
     fi
-    [ -f "$cache_path" ] && echo "$cache_path"
 }
 
-FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON") || exit
+FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
 
 IFS=:
 for datadir in $DATA_DIRS; do unset IFS
