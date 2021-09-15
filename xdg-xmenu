@@ -14,8 +14,13 @@ XDG_DATA_DIRS=${XDG_DATA_DIRS:-/usr/share:/usr/local/share}
 SHOW_ALL=${XDG_MENU_SHOW_ALL:-}
 TERMINAL=${XDG_MENU_TERMINAL:-xterm}
 SIZE=${XDG_MENU_ICON_SIZE:-24}
-ICON_THEME=${XDG_MENU_ICON_THEME:-$(awk -F= '/gtk-icon-theme-name/{ print $2 }' \
-                                    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini")}
+ICON_THEME=${XDG_MENU_ICON_THEME:-$(
+    if command -v gtk-query-settings > /dev/null; then
+        gtk-query-settings gtk-icon-theme-name | awk '{ print $2 }' | tr -d '"'
+    else
+        echo Adwaita
+    fi
+)}
 FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
 # Read CLI arguments
