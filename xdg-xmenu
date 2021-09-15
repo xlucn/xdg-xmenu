@@ -94,8 +94,6 @@ all_dirs=$(find_all_dirs)
 # Search for an icon based on its name
 find_icon() {
     icon=$1
-    # icon is a existing file
-    [ -f "$icon" ] && echo "$icon" && return
     # find any png, svg or xpm icon in available directories
     for dir in $all_dirs; do
         for ext in png svg xpm; do
@@ -112,6 +110,9 @@ find_icon() {
 # xmenu does not support svg, so convert svg to png
 cache_icon() {
     icon=$1
+    # icon is a existing file
+    [ -f "$icon" ] && echo "$icon" && return
+
     # cache to $CACHE_ICON_DIR with the same name
     # ISSUE: degeneration of file names
     icon_name=${icon##*/}
