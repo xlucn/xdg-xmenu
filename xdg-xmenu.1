@@ -1,4 +1,4 @@
-.TH xdg-xmenu 1 "August 2020" git
+.TH xdg-xmenu 1 "September 2021" git
 .SH NAME
 xdg-xmenu - generate desktop menu file for
 .IR xmenu (1)
@@ -6,7 +6,9 @@ xdg-xmenu - generate desktop menu file for
 xdg\-xmenu
 [\fB\-a\fR]
 [\fB\-b \fIfallback_font\fR]
+[\fB\-f\fR]
 [\fB\-i \fIicon_theme\fR]
+[\fB\-n\fR]
 [\fB\-s \fIicon_size\fR]
 [\fB\-t \fIterminal\fR]
 .SH DESCRIPTION
@@ -23,8 +25,16 @@ Fallback icon in case one can not be found.
 Both an icon name and a file path is acceptable.
 Default is application-x-executable.
 .TP
+\fB\-f\fR
+Force to cache svg icons to png, even if cached images already exist. Useful
+when switching to a new icon theme.
+.TP
 \fB\-i \fIicon_theme\fR
 Icon theme. Default is parsed from gtk3 configuration file.
+\fB\-n\fR
+Dry run mode. The conversion of svg images will be skipped. In others words,
+there is no file operations. The menu will still be printed with all the
+icon paths.
 .TP
 \fB\-s \fIicon_size\fR
 Icon size. Default is 24 if not specified.
@@ -48,14 +58,17 @@ Since
 .IR xmenu (1)
 does not support svg format as icons, this script will convert the found svg
 files to png images and cache them in $XDG_CACHE_HOME/xdg-xmenu/.
-By default, png and xpm icons will be copied to the cache folder.
 .TP
 .B Menu
 The script will output the menu that can be used by
 .IR xmenu (1)
-to stdout. You can run this command to use it:
+to stdout. You can generate a menu with:
 .IP
-xdg-menu > menu; xmenu < menu | sh &
+    xdg-menu > menu
+.IP
+and run xmenu with:
+.IP
+    xmenu < menu | sh &
 .IP
 It's not recommended to pipe the output to xmenu due to the speed.
 .SH DEPENDENCIES
@@ -74,9 +87,6 @@ This command is provided by
 This is about as fast as convert command for small svg icons.
 .SH SEE ALSO
 .IR xmenu (1),
-.IR rsvg-convert (1)
-.IR convert (1)
-.IR inkscape (1)
 .SH BUGS
 The implementation does not cover everything in the freedesktop specifications,
 so it is possible that a desktop entry is parsed incorrectly or an icon is not found.

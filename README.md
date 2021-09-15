@@ -6,36 +6,43 @@ This script is only a toy project and I have not tested it outside of my own mac
 
 ## Requirement
 
-The script will look for icons according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following convert tools (sorted by priority):
+The script will look for icons loosely according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following tools (sorted by priority) to convert svg images to pngs:
 
 - `rsvg-convert`: provided by `librsvg` package, it is the fastest one among the three.
 - `convert`: provided by `imagemagick` package.
 - `inkscape`: this is about as fast (or slow) as `convert`
 
-The svg icons will be converted to png images and be cached to `~/.cache/xdg-xmenu/icons` folder. As a result, the first time running this script might cost some time.
+The generated png images will be cached to `~/.cache/xdg-xmenu/icons` folder. As a result, the first time running this script might cost some time.
 
 ## Usage
 
 ```
-xdg-xmenu [-a] [-b fallback_icon] [-i icon_theme] [-s icon_size] [-t terminal]
+xdg-xmenu [-a] [-b fallback_icon] [-f] [-i icon_theme] [-n] [-s icon_size] [-t terminal]
 
 Options
-  -a  Show icons with `OnlyShowIn' key in .desktop file.  These desktop entries are
-      usually programs specifically for desktop environments.  Default is not show‐
+  -a  Show icons with `OnlyShowIn' key in .desktop file. These desktop entries are
+      usually programs specifically for desktop environments. Default is not show‐
       ing those desktop entries.
 
   -b fallback_icon
-      Fallback  icon  in  case  one can not be found.  Both an icon name and a file
-      path is acceptable.  Default is application-x-executable.
+      Fallback icon in case one can not be found. Both an icon name and a file
+      path is acceptable. Default is application-x-executable.
+
+  -f  Force to cache svg icons to png, even if cached images already exist. Useful
+      when switching to a new icon theme.
 
   -i icon_theme
-      Icon theme.  Default is parsed from gtk3 configuration file.
+      Icon theme. Default is parsed from gtk3 configuration file.
+
+  -n  Dry run mode. The conversion of svg images will be skipped. In others words,
+      there is no file operations. The menu will still be printed with all the
+      icon paths.
 
   -s icon_size
-      Icon size.  Default is 24.
+      Icon size. Default is 24.
 
   -t terminal
-      Terminal emulator to use.  Default is xterm.
+      Terminal emulator to use. Default is xterm.
 ```
 
 To use it, you can redirect the output to a file and then feed it to `xmenu` by
