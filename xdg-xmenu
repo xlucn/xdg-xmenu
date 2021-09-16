@@ -1,6 +1,8 @@
 #!/bin/sh
-# References: https://specifications.freedesktop.org
-# PATH=/opt/sbase/bin:$PATH
+# Author: Lu Xu <oliver_lew at outlook dot com>
+# License: MIT
+# References: https://specifications.freedesktop.org/desktop-entry-spec
+#             https://specifications.freedesktop.org/icon-theme-spec
 
 # XDG directories
 XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
@@ -24,7 +26,8 @@ while getopts "ab:i:s:t:" arg; do
         i) ICON_THEME=$OPTARG;;
         s) SIZE=$OPTARG;;
         t) TERMINAL=$OPTARG;;
-        *) ;;
+        *) echo "$0 [-a] [-b icon] [-i theme] [-s size] [-t term]"
+           break ;;
     esac
 done
 
@@ -35,24 +38,43 @@ CACHE_ICON_DIR="$CACHE_DIR/icons"
 mkdir -p "$CACHE_ICON_DIR"
 
 # Find directories in an icon theme matching the target size
-valid_dirs() { # arg: theme folder
-    [ -f "$1/index.theme" ] || return
+valid_dirs() {
+    theme_dir=$1
+    [ -f "$theme_dir/index.theme" ] || return
     while IFS='=' read -r key value; do
+        # parse the index.theme file
         case "$key" in
-        \[*\]) unset MaxSize MinSize Scale Size Type dir flag
-            dir=${key#[}; dir=${dir%]} ;;
-        *) [ -n "$value" ] && eval "$key=\"$value\""
+        \[*\]) # each subdirectory is a section, clean up variables
+            unset MaxSize MinSize Scale Size Type subdir flag
+            subdir=${key#[}
+            subdir=${subdir%]}
+            ;;
+        *)
+            [ -n "$value" ] && eval "$key=\"$value\""
+            ;;
         esac
-        [ -n "$flag" ] || [ "${Scale-1}" = 2 ] && continue
+
+        # skip until next section
+        [ -n "$flag" ] && continue
+
+        # ISSUE: ignore 2x icons
+        [ "${Scale-1}" = 2 ] && continue
+
+        # find subdirectory with suitable icons size based on 'Type'
+        # 1. fixed size, has to be exact
         { [ "${Type-}" = Fixed ] && [ "${Size-0}" = "$SIZE" ]; } ||
+        # 2. threshold size, treat as lower limit
         { [ "${Type-}" = Threshold ] && [ "${Size-0}" -gt "$SIZE" ]; } ||
+        # 3. scalable size, Min/MaxSize as lower/upper limits
         { [ "${Type-}" = Scalable ] && [ "$SIZE" -gt "${MinSize-65535}" ] &&
-            [ "$SIZE" -lt "${MaxSize-0}" ]; } && { flag=1; echo "$1/$dir"; }
-    done < "$1/index.theme"
+            [ "$SIZE" -lt "${MaxSize-0}" ]; } &&
+        # found it
+        { flag=1; echo "$theme_dir/$subdir"; }
+    done < "$theme_dir/index.theme"
 }
 
 # Find all directories matching the size and containing icons directly
-find_all_dirs() { # no args
+find_all_dirs() {
     IFS=':'
     for datadir in $DATA_DIRS; do unset IFS
         for theme in "$ICON_THEME" "hicolor"; do
@@ -65,29 +87,44 @@ find_all_dirs() { # no args
 all_dirs=$(find_all_dirs)
 
 # Search for an icon based on its name
-find_icon() { # args: icon name
-    [ -f "$1" ] && echo "$1" && return
+find_icon() {
+    icon=$1
+    # icon is a existing file
+    [ -f "$icon" ] && echo "$icon" && return
+    # find any png, svg or xpm icon in available directories
     for dir in $all_dirs; do
         for ext in png svg xpm; do
-            [ -f "$dir/$1.$ext" ] && echo "$dir/$1.$ext" && return
+            if [ -f "$dir/$icon.$ext" ]; then
+                echo "$dir/$icon.$ext"
+                return
+            fi
         done
     done
     # when the fallback icon is not found, return none instead
-    [ "$1" = "$FALLBACK_ICON" ] && echo "" || echo "$FALLBACK_ICON"
+    [ "$icon" = "$FALLBACK_ICON" ] && echo "" || echo "$FALLBACK_ICON"
 }
 
+# xmenu does not support svg, so convert svg to png
 cache_icon() {
-    icon_name=${1##*/}; icon_name=${icon_name%.*}
+    icon=$1
+    # cache to $CACHE_ICON_DIR with the same name
+    # ISSUE: degeneration of file names
+    icon_name=${icon##*/}
+    icon_name=${icon_name%.*}
     cache_path="$CACHE_ICON_DIR/$icon_name.png"
+
+    # already cached
     [ -f "$cache_path" ] && echo "$cache_path" && return
-    icon_path=$(find_icon "$1")
+    icon_path=$(find_icon "$icon")
+
+    # convert svg -> png
     if [ "${icon_path##*.}" = "svg" ]; then
+        # first try the fasted, then the slower ones
         if command -v rsvg-convert > /dev/null; then
             rsvg-convert -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
-        elif command -v convert > /dev/null 2>&1; then
-            convert -background none -size "${SIZE}x${SIZE}" \
-                    "$icon_path" "$cache_path"
-        elif command -v inkscape > /dev/null 2>&1; then
+        elif command -v convert > /dev/null; then
+            convert -background none -size "${SIZE}x${SIZE}" "$icon_path" "$cache_path"
+        elif command -v inkscape > /dev/null; then
             inkscape -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
         else
             echo >&2 "[Error]: Convert svg icons failed."
@@ -105,6 +142,7 @@ cache_icon() {
 
 FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
 
+# parse the desktop entries and categorize them
 IFS=:
 for datadir in $DATA_DIRS; do unset IFS
     appdir="$datadir/applications"
@@ -121,6 +159,7 @@ for datadir in $DATA_DIRS; do unset IFS
                 cmd=$(echo "$cmd" | sed 's/ %[fFuUick]//g' | sed 's/%%/$/g') ;;
             NoDisplay) [ "$value" != "false" ] && nodisplay=1 ;;
             Terminal) [ "$value" != "false" ] && useterm=1 ;;
+            # ISSUE: show_all not working as it should
             OnlyShowIn) [ -z "$SHOW_ALL" ] && nodisplay=1 ;;
             esac
         done < "$app"
@@ -152,10 +191,15 @@ for datadir in $DATA_DIRS; do unset IFS
     done
 done
 
-category_sort() { # $1: icon name, $2: category name, $3: items
-    icon=$(cache_icon "$1") || exit
-    printf "${icon:+IMG:$icon\t}%s\n" "$2"
-    printf "$3%s" | sort -f -k 2 | uniq
+category_sort() {
+    category_icon=$1
+    category_name=$2
+    category_apps=$3
+    icon=$(cache_icon "$category_icon") || exit
+    # create top level folder
+    printf "${icon:+IMG:$icon\t}%s\n" "$category_name"
+    # sort the applications by their names
+    printf "$category_apps%s" | sort -f -k 2 | uniq
 }
 
 category_sort applications-accessories Accessories "$Accessories"
