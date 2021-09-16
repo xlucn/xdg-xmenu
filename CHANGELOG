@@ -1,0 +1,34 @@
+0.3.0 2021-09-16
+
+Added:
+- `-f` option to force caching icons even if already cached. Useful when
+  switching to a new icon theme, or the icon theme get updated.
+- `-n` option to skip icon caching, a.k.a. dry run mode.
+
+Changes:
+- Png and xpm icon images are not copied to cache directory anymore.
+  Their original path will be used in the generated menu.
+  This could bring some speed compromising, since the icons will be
+  searched every time.
+- Use `gtk-query-settings` command to get default icon theme, instead of
+  parsing settings.ini file of gtk3.
+  If this command is unavailable and an icon theme is not specified
+  explicitly, "Adwaita" will be used.
+- The extension (for now, svg) won't be stripped in the generated cache
+  image, i.e., icon.svg will be cached to icon.svg.png instead of icon.png.
+
+
+0.2.0 2021-05-06
+
+Added:
+- Add environment variables.
+
+Fixed:
+- Does not exit anymore if fallback icon can not be found. #1
+- Fix empty IMG: tag. #2
+- Fix file creation error when Icon key is a full path. #3
+
+
+0.1.0 2020-08-05
+
+Initial release.
