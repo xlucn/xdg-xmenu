@@ -3,6 +3,8 @@
 Fixed:
 - After printing the help message, the script won't exit. Now a `-h`
   switch is added, and the script will exit after help message.
+- A possible rare case, where a svg path in desktop entry, the saved png
+  paths might conflict if more than one svg paths have same basename. #4
 
 
 0.3.0 2021-09-16

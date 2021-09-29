@@ -111,19 +111,21 @@ find_icon() {
 # xmenu does not support svg, so convert svg to png
 cache_icon() {
     icon=$1
-    # icon is a existing file
-    [ -f "$icon" ] && echo "$icon" && return
 
-    # cache to $CACHE_ICON_DIR with the same name
-    # ISSUE: degeneration of file names
-    cache_path="$CACHE_ICON_DIR/${icon##*/}.png"
+    # icon is a existing png/xpm file
+    [ -f "$icon" ] && [ ${icon##*.} != 'svg' ] && echo "$icon" && return
+
+    # cache path in $CACHE_ICON_DIR with the flattened name
+    [ -f "$icon" ] && basename=$(echo $icon | tr '/' '_') || basename=${icon##*/}
+    cache_path=$CACHE_ICON_DIR/$basename.png
 
     # already cached, skip unless forced to cache again
     if [ -f "$cache_path" ] && [ -z "$force_cache" ]; then
         echo "$cache_path" && return
     fi
 
-    icon_path=$(find_icon "$icon")
+    # find the icon in icon themes if the name is not a path
+    [ -f "$icon" ] && icon_path=$icon || icon_path=$(find_icon "$icon")
 
     # convert svg -> png
     if [ "${icon_path##*.}" = "svg" ]; then
