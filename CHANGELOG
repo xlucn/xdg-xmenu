@@ -1,3 +1,10 @@
+0.3.1
+
+Fixed:
+- After printing the help message, the script won't exit. Now a `-h`
+  switch is added, and the script will exit after help message.
+
+
 0.3.0 2021-09-16
 
 Added:

@@ -24,7 +24,7 @@ ICON_THEME=${XDG_MENU_ICON_THEME:-$(
 FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
 # Read CLI arguments
-while getopts "ab:fi:ns:t:" arg; do
+while getopts "ab:fhi:ns:t:" arg; do
     case "$arg" in
         a) SHOW_ALL=1;;
         b) FALLBACK_ICON=$OPTARG;;
@@ -33,8 +33,7 @@ while getopts "ab:fi:ns:t:" arg; do
         n) not_cache=1;;
         s) SIZE=$OPTARG;;
         t) TERMINAL=$OPTARG;;
-        *) echo "$0 [-a] [-b icon] [-f] [-i theme] [-n] [-s size] [-t term]"
-           break ;;
+        h|*) echo "$0 [-a] [-b icon] [-f] [-i theme] [-n] [-s size] [-t term]" && exit ;;
     esac
 done
 
