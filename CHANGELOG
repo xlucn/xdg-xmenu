@@ -1,6 +1,8 @@
 0.3.1
 
 Fixed:
+- Now the size matching is following the freedesktop specification more
+  strictly, but still not exact, though.
 - After printing the help message, the script won't exit. Now a `-h`
   switch is added, and the script will exit after help message.
 - A possible rare case, where a svg path in desktop entry, the saved png

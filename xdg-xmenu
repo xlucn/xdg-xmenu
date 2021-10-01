@@ -50,32 +50,42 @@ valid_dirs() {
     while IFS='=' read -r key value; do
         # parse the index.theme file
         case "$key" in
-        \[*\]) # each subdirectory is a section, clean up variables
-            unset MaxSize MinSize Scale Size Type subdir flag
+        \[*\])
+            # FIXME: scaled icons are ignored for now, sorry HiDPI
+            # deal with last subdirectory, only Size is mandatory
+            if [ "${Scale-1}" = 1 ] && [ -n "$Size" ]; then
+                # defaults if they are not specified
+                Type=${Type:-Threshold}
+                MaxSize=${MaxSize:-Size}
+                MinSize=${MinSize:-Size}
+                Threshold=${Threshold:-2}
+
+                # match subdirectory sizes based on 'Type'
+                # 1. fixed size, has to be exact
+                { [ "$Type" = Fixed ] &&
+                    [ "$SIZE" = "$Size" ]; } ||
+                # 2. threshold size, within Threshold times
+                { [ "$Type" = Threshold ] &&
+                    [ "$SIZE" -ge "$((Size / Threshold))" ] &&
+                    [ "$SIZE" -le "$((Size * Threshold))" ]; } ||
+                # 3. scalable size, Min/MaxSize as lower/upper limits
+                { [ "$Type" = Scalable ] && 
+                    [ "$SIZE" -ge "$MinSize" ] &&
+                    [ "$SIZE" -le "$MaxSize" ]; } &&
+                # found it
+                echo "$theme_dir/$subdir"
+            fi
+
+            # clean up variables for the new subdirectory
+            unset MaxSize MinSize Scale Size Threshold Type subdir
             subdir=${key#[}
             subdir=${subdir%]}
             ;;
         *)
+            # read each key-value pair into shell variables
             [ -n "$value" ] && eval "$key=\"$value\""
             ;;
         esac
-
-        # skip until next section
-        [ -n "$flag" ] && continue
-
-        # ISSUE: ignore 2x icons
-        [ "${Scale-1}" = 2 ] && continue
-
-        # find subdirectory with suitable icons size based on 'Type'
-        # 1. fixed size, has to be exact
-        { [ "${Type-}" = Fixed ] && [ "${Size-0}" = "$SIZE" ]; } ||
-        # 2. threshold size, treat as lower limit
-        { [ "${Type-}" = Threshold ] && [ "${Size-0}" -gt "$SIZE" ]; } ||
-        # 3. scalable size, Min/MaxSize as lower/upper limits
-        { [ "${Type-}" = Scalable ] && [ "$SIZE" -gt "${MinSize-65535}" ] &&
-            [ "$SIZE" -lt "${MaxSize-0}" ]; } &&
-        # found it
-        { flag=1; echo "$theme_dir/$subdir"; }
     done < "$theme_dir/index.theme"
 }
 
@@ -174,7 +184,7 @@ for datadir in $DATA_DIRS; do unset IFS
                         ) ;;
             NoDisplay)  [ "$value" != "false" ] && nodisplay=1 ;;
             Terminal)   [ "$value" != "false" ] && useterm=1 ;;
-            # ISSUE: show_all not working as it should
+            # FIXME: show_all not working as it should
             OnlyShowIn)     [ -z "$SHOW_ALL" ] && nodisplay=1 ;;
             esac
         done < "$app"
@@ -214,6 +224,7 @@ category_sort() {
     # create top level folder
     printf "${icon:+IMG:$icon\t}%s\n" "$category_name"
     # sort the applications by their names
+    # FIXME: when icon is missing, name is in first column
     printf "$category_apps%s" | sort -f -k 2 | uniq
 }
 
