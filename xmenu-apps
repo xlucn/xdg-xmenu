@@ -1,9 +1,0 @@
-#!/bin/sh
-XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
-mkdir -p "$XDG_CACHE_HOME/xdg-xmenu"
-MENU_FILE=$XDG_CACHE_HOME/xdg-xmenu/menu
-if [ "$1" = "-u" ]; then
-    xdg-xmenu -t st > "$MENU_FILE"
-elif [ -f "$MENU_FILE" ]; then
-    xmenu "$@" < "$MENU_FILE" | sh &
-fi
