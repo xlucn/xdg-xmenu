@@ -66,8 +66,8 @@ valid_dirs() {
                     [ "$SIZE" = "$Size" ]; } ||
                 # 2. threshold size, within Threshold times
                 { [ "$Type" = Threshold ] &&
-                    [ "$SIZE" -ge "$((Size / Threshold))" ] &&
-                    [ "$SIZE" -le "$((Size * Threshold))" ]; } ||
+                    [ "$SIZE" -ge "$((Size - Threshold))" ] &&
+                    [ "$SIZE" -le "$((Size + Threshold))" ]; } ||
                 # 3. scalable size, Min/MaxSize as lower/upper limits
                 { [ "$Type" = Scalable ] && 
                     [ "$SIZE" -ge "$MinSize" ] &&
