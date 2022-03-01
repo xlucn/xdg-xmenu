@@ -24,7 +24,7 @@ ICON_THEME=${XDG_MENU_ICON_THEME:-$(
 FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
 # Read CLI arguments
-while getopts "ab:fhi:ns:t:" arg; do
+while getopts "ab:fhi:ns:St:" arg; do
     case "$arg" in
         a) SHOW_ALL=1;;
         b) FALLBACK_ICON=$OPTARG;;
@@ -32,8 +32,9 @@ while getopts "ab:fhi:ns:t:" arg; do
         i) ICON_THEME=$OPTARG;;
         n) not_cache=1;;
         s) SIZE=$OPTARG;;
+        S) no_svg_cache=1;;
         t) TERMINAL=$OPTARG;;
-        h|*) echo "$0 [-a] [-b icon] [-f] [-i theme] [-n] [-s size] [-t term]" && exit ;;
+        h|*) echo "$0 [-afnS] [-b icon] [-i theme] [-s size] [-t term]" && exit ;;
     esac
 done
 
@@ -122,15 +123,21 @@ find_icon() {
 cache_icon() {
     icon=$1
 
-    # icon is a existing png/xpm file
-    [ -f "$icon" ] && [ "${icon##*.}" != 'svg' ] && echo "$icon" && return
+    if [ -f "$icon" ]; then
+        # icon is a existing png/xpm file
+        if [ "${icon##*.}" != 'svg' ] || [ -n "$no_svg_cache" ]; then
+            echo "$icon" && return
+        fi
+        basename=$(echo "$icon" | tr '/' '_')
+    else
+        basename=${icon##*/}
+    fi
 
     # cache path in $CACHE_ICON_DIR with the flattened name
-    [ -f "$icon" ] && basename=$(echo "$icon" | tr '/' '_') || basename=${icon##*/}
     cache_path=$CACHE_ICON_DIR/$basename.png
 
     # already cached, skip unless forced to cache again
-    if [ -f "$cache_path" ] && [ -z "$force_cache" ]; then
+    if [ -f "$cache_path" ] && [ -z "$force_cache" ] && [ -z "$no_svg_cache" ]; then
         echo "$cache_path" && return
     fi
 
@@ -138,7 +145,7 @@ cache_icon() {
     [ -f "$icon" ] && icon_path=$icon || icon_path=$(find_icon "$icon")
 
     # convert svg -> png
-    if [ "${icon_path##*.}" = "svg" ]; then
+    if [ "${icon_path##*.}" = "svg" ] && [ -z "$no_svg_cache" ]; then
         # first try the fasted, then the slower ones
         if [ -n "$not_cache" ]; then
             : # not doing caching in dry run mode

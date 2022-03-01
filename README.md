@@ -41,6 +41,8 @@ Options
   -s icon_size
       Icon size. Default is 24.
 
+  -S  Do not cache svg icons, use svg files directly. Supported since Imlib2 1.8.0.
+
   -t terminal
       Terminal emulator to use. Default is xterm.
 ```

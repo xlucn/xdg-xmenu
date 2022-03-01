@@ -1,32 +1,30 @@
+0.4.0
+
+Added:
+- Option to use svg icons without cache, supported by Imlib2 1.8.0
+
+Fixed:
+- Threshold checking
+
 0.3.1
 
 Fixed:
-- Now the size matching is following the freedesktop specification more
-  strictly, but still not exact, though.
-- After printing the help message, the script won't exit. Now a `-h`
-  switch is added, and the script will exit after help message.
-- A possible rare case, where a svg path in desktop entry, the saved png
-  paths might conflict if more than one svg paths have same basename. #4
+- Better size matching following the specification
+- The script won't exit after the help message
+- Cached pngs might conflict for different svg files. #4
 
 
 0.3.0 2021-09-16
 
 Added:
-- `-f` option to force caching icons even if already cached. Useful when
-  switching to a new icon theme, or the icon theme get updated.
-- `-n` option to skip icon caching, a.k.a. dry run mode.
+- `-f` option to force caching icons
+- `-n` option to skip icon caching, a.k.a. dry run mode
 
 Changes:
 - Png and xpm icon images are not copied to cache directory anymore.
-  Their original path will be used in the generated menu.
-  This could bring some speed compromising, since the icons will be
-  searched every time.
-- Use `gtk-query-settings` command to get default icon theme, instead of
-  parsing settings.ini file of gtk3.
-  If this command is unavailable and an icon theme is not specified
-  explicitly, "Adwaita" will be used.
-- The extension (for now, svg) won't be stripped in the generated cache
-  image, i.e., icon.svg will be cached to icon.svg.png instead of icon.png.
+  But the icons will be searched every time
+- Different way to get icon theme
+- Keep the original icon file extension
 
 
 0.2.0 2021-05-06
