@@ -6,7 +6,21 @@
 
 import os
 import argparse
-import configparser
+
+
+def ini_parse(inifile):
+    content = {}
+    section = None
+
+    for line in open(inifile):
+        if line[0] == '[' and line[-2] == ']':
+            section = line[1:-2]
+            content[section] = {}
+        elif line.find("=") >= 0 and section:
+            key, sep, value = line.partition("=")
+            content[section][key.strip()] = value.strip()
+
+    return content
 
 
 def get_args():
@@ -19,7 +33,7 @@ def get_args():
                         help='Icon theme for app icons')
     parser.add_argument('-e', '--xdg-de', action='store_true',
                         help='Show apps according to desktop environments')
-    parser.add_argument('-N', '--dry-run', action='store_true',
+    parser.add_argument('-n', '--dry-run', action='store_true',
                         help='Do not run app, output to stdout')
     parser.add_argument('-t', '--terminal', metavar='terminal', default='xterm',
                         help='Terminal emulator to use, default is %(default)s')
@@ -33,20 +47,19 @@ def valid_dirs(theme_dir):
         return []
 
     # parse the index.theme file
-    entries = configparser.RawConfigParser()
-    entries.read(indexfile)
-    for subdir in entries.get("Icon Theme", "Directories").rstrip(",").split(","):
+    entries = ini_parse(indexfile)
+    for subdir in entries["Icon Theme"]["Directories"].rstrip(",").split(","):
         # "Size" is required
-        Size = entries.getint(subdir, "Size")
+        Size = int(entries[subdir]["Size"])
         # FIXME: scaled icons are ignored for now, sorry HiDPI
-        if entries.getint(subdir, "Scale", fallback=1) != 1:
+        if int(entries[subdir].get("Scale", "1")) != 1:
             continue
 
         # defaults if they are not specified
-        Type = entries.get(subdir, "Type", fallback="Threshold")
-        MaxSize = entries.getint(subdir, "MaxSize", fallback=Size)
-        MinSize = entries.getint(subdir, "MinSize", fallback=Size)
-        Threshold = entries.getint(subdir, "Threshold", fallback=2)
+        Type = entries[subdir].get("Type", "Threshold")
+        MaxSize = int(entries[subdir].get("MaxSize", Size))
+        MinSize = int(entries[subdir].get("MinSize", Size))
+        Threshold = int(entries[subdir].get("Threshold", 2))
 
         # match subdirectory sizes based on 'Type'
         if ((Type == "Threshold" and abs(args.icon_size - Size) <= Threshold) or
@@ -187,8 +200,7 @@ if __name__ == "__main__":
 
     menu = {}
     for app in get_apps():
-        app_parser = configparser.RawConfigParser()
-        app_parser.read(app)
+        app_parser = ini_parse(app)
         entry = app_parser["Desktop Entry"]
         if if_show(entry):
             item = gen_entry(entry)
