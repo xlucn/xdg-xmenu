@@ -81,27 +81,29 @@ def gen_entry(entry):
     Exec = entry.get('Exec')
     Icon = entry.get('Icon')
     Name = entry.get('Name')
-    Terminal = entry.get('Terminal') == 'true'
+    Terminal = entry.get('Terminal')
     GenericName = entry.get('GenericName')
     Categories = entry.get('Categories')
 
-    Exec = Exec.replace('%f', '') \
-               .replace('%F', '') \
-               .replace('%u', '') \
-               .replace('%U', '') \
-               .replace('%c', Name) \
-               .replace('%k', entry.get('Path', ''))
-    if Terminal:
-        Exec = f"{args.terminal} -e {Exec}"
+    cmd = Exec.replace('%f', '') \
+              .replace('%F', '') \
+              .replace('%u', '') \
+              .replace('%U', '') \
+              .replace('%c', Name) \
+              .replace('%k', entry.get('Path', ''))
+    if Terminal == "true":
+        cmd = f"{args.terminal} -e {cmd}"
 
-    Icon = find_icon(Icon, fallback)
+    icon = find_icon(Icon, fallback)
 
-    line = f"\tIMG:{Icon}\t{Name}({GenericName})\t{Exec}"
+    name = f"{Name} ({GenericName})" if GenericName else Name
 
+    category = "Others"
     for c in Categories.rstrip(";").split(";"):
         if categories.get(c):
-            return categories[c]["name"], line
-    return categories["Others"]["name"], line
+            category = c
+
+    return {"category": category, "icon": icon, "name": name, "cmd": cmd}
 
 
 def if_show(entry):
@@ -117,7 +119,7 @@ def if_show(entry):
             if os.path.exists(TryExec):
                 return True
         else:
-            for path in os.getenv("PATH"):
+            for path in os.getenv("PATH").split(":"):
                 if os.path.exists(os.path.join(path, TryExec)):
                     return True
         return False
@@ -189,14 +191,16 @@ if __name__ == "__main__":
         app_parser.read(app)
         entry = app_parser["Desktop Entry"]
         if if_show(entry):
-            category, item = gen_entry(entry)
-            if menu.get(category):
-                menu[category].append(item)
+            item = gen_entry(entry)
+            if menu.get(item["category"]):
+                menu[item["category"]].append(item)
             else:
-                menu[category] = [item]
+                menu[item["category"]] = [item]
 
     for category in menu:
-        icon = find_icon("applications-other", fallback)
-        print(f"IMG:{icon}\t{category}")
+        category_name = categories[category]["name"]
+        category_icon = categories[category]["icon"]
+        icon_file = find_icon(category_icon, fallback)
+        print(f"IMG:{icon_file}\t{category_name}")
         for item in menu[category]:
-            print(item)
+            print("\tIMG:{icon}\t{name}\t{cmd}".format_map(item))
