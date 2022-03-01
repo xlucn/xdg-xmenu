@@ -123,10 +123,10 @@ cache_icon() {
     icon=$1
 
     # icon is a existing png/xpm file
-    [ -f "$icon" ] && [ ${icon##*.} != 'svg' ] && echo "$icon" && return
+    [ -f "$icon" ] && [ "${icon##*.}" != 'svg' ] && echo "$icon" && return
 
     # cache path in $CACHE_ICON_DIR with the flattened name
-    [ -f "$icon" ] && basename=$(echo $icon | tr '/' '_') || basename=${icon##*/}
+    [ -f "$icon" ] && basename=$(echo "$icon" | tr '/' '_') || basename=${icon##*/}
     cache_path=$CACHE_ICON_DIR/$basename.png
 
     # already cached, skip unless forced to cache again
