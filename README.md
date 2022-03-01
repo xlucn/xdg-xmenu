@@ -1,10 +1,14 @@
 # xdg-xmenu
 
+**Note:** A python version is being (or has been) worked on, which is a little bit faster. The shell version probably won't get feature updates anymore.
+
 `xdg-xmenu` is a small shell script to generate xdg desktop menu file for [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility.
 
 This script is only a toy project and I have not tested it outside of my own machine, so bugs are expected and feel free to report them here.
 
 ## Requirement
+
+**Update:** Since Imlib2 1.8.0, svg images can be rendered directly, so the following caching can be skipped. Recent `xdg-xmenu` provides a `-S` option to use the svg paths, see usage below.
 
 The script will look for icons loosely according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following tools (sorted by priority) to convert svg images to pngs:
 
