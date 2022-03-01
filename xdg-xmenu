@@ -1,242 +1,218 @@
-#!/bin/sh
+#!/usr/bin/env python
 # Author: Lu Xu <oliver_lew at outlook dot com>
 # License: MIT
 # References: https://specifications.freedesktop.org/desktop-entry-spec
 #             https://specifications.freedesktop.org/icon-theme-spec
 
-# XDG directories
-XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
-XDG_CACHE_HOME=${XDG_CACHE_HOME:-$HOME/.cache}
-XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-$HOME/.config}
-XDG_DATA_DIRS=${XDG_DATA_DIRS:-/usr/share:/usr/local/share}
+import os
+import argparse
 
-# Apply default configuration values
-SHOW_ALL=${XDG_MENU_SHOW_ALL:-}
-TERMINAL=${XDG_MENU_TERMINAL:-xterm}
-SIZE=${XDG_MENU_ICON_SIZE:-24}
-ICON_THEME=${XDG_MENU_ICON_THEME:-$(
-    if command -v gtk-query-settings > /dev/null; then
-        gtk-query-settings gtk-icon-theme-name | awk '{ print $2 }' | tr -d '"'
-    else
-        echo Adwaita
-    fi
-)}
-FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
-# Read CLI arguments
-while getopts "ab:fhi:ns:t:" arg; do
-    case "$arg" in
-        a) SHOW_ALL=1;;
-        b) FALLBACK_ICON=$OPTARG;;
-        f) force_cache=1;;
-        i) ICON_THEME=$OPTARG;;
-        n) not_cache=1;;
-        s) SIZE=$OPTARG;;
-        t) TERMINAL=$OPTARG;;
-        h|*) echo "$0 [-a] [-b icon] [-f] [-i theme] [-n] [-s size] [-t term]" && exit ;;
-    esac
-done
+def ini_parse(inifile):
+    content = {}
+    section = None
 
-# Directories
-DATA_DIRS=$XDG_DATA_HOME:$XDG_DATA_DIRS
-CACHE_DIR="$XDG_CACHE_HOME/xdg-xmenu"
-CACHE_ICON_DIR="$CACHE_DIR/icons"
-mkdir -p "$CACHE_ICON_DIR"
+    for line in open(inifile):
+        if line[0] == '[' and line[-2] == ']':
+            section = line[1:-2]
+            content[section] = {}
+        elif line.find("=") >= 0 and section:
+            key, sep, value = line.partition("=")
+            content[section][key.strip()] = value.strip()
 
-# Find directories in an icon theme matching the target size
-valid_dirs() {
-    theme_dir=$1
-    [ -f "$theme_dir/index.theme" ] || return
-    while IFS='=' read -r key value; do
-        # parse the index.theme file
-        case "$key" in
-        \[*\])
-            # FIXME: scaled icons are ignored for now, sorry HiDPI
-            # deal with last subdirectory, only Size is mandatory
-            if [ "${Scale-1}" = 1 ] && [ -n "$Size" ]; then
-                # defaults if they are not specified
-                Type=${Type:-Threshold}
-                MaxSize=${MaxSize:-Size}
-                MinSize=${MinSize:-Size}
-                Threshold=${Threshold:-2}
+    return content
 
-                # match subdirectory sizes based on 'Type'
-                # 1. fixed size, has to be exact
-                { [ "$Type" = Fixed ] &&
-                    [ "$SIZE" = "$Size" ]; } ||
-                # 2. threshold size, within Threshold times
-                { [ "$Type" = Threshold ] &&
-                    [ "$SIZE" -ge "$((Size / Threshold))" ] &&
-                    [ "$SIZE" -le "$((Size * Threshold))" ]; } ||
-                # 3. scalable size, Min/MaxSize as lower/upper limits
-                { [ "$Type" = Scalable ] && 
-                    [ "$SIZE" -ge "$MinSize" ] &&
-                    [ "$SIZE" -le "$MaxSize" ]; } &&
-                # found it
-                echo "$theme_dir/$subdir"
-            fi
 
-            # clean up variables for the new subdirectory
-            unset MaxSize MinSize Scale Size Threshold Type subdir
-            subdir=${key#[}
-            subdir=${subdir%]}
-            ;;
-        *)
-            # read each key-value pair into shell variables
-            [ -n "$value" ] && eval "$key=\"$value\""
-            ;;
-        esac
-    done < "$theme_dir/index.theme"
-}
+def get_args():
+    parser = argparse.ArgumentParser(description="A python rewrite of the shell version")
+    parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
+                        help='Fallback icon for apps without icons')
+    parser.add_argument('-i', '--icon-theme', default="Adwaita",
+                        help='Icon theme for app icons')
+    parser.add_argument('-s', '--icon-size', type=int, default=24,
+                        help='Icon theme for app icons')
+    parser.add_argument('-e', '--xdg-de', action='store_true',
+                        help='Show apps according to desktop environments')
+    parser.add_argument('-n', '--dry-run', action='store_true',
+                        help='Do not run app, output to stdout')
+    parser.add_argument('-t', '--terminal', metavar='terminal', default='xterm',
+                        help='Terminal emulator to use, default is %(default)s')
+    return parser.parse_args()
 
-# Find all directories matching the size and containing icons directly
-find_all_dirs() {
-    IFS=':'
-    for datadir in $DATA_DIRS; do unset IFS
-        for theme in "$ICON_THEME" "hicolor"; do
-            valid_dirs "$datadir/icons/$theme"
-        done
-    done
-    echo "/usr/share/pixmaps"
-}
 
-all_dirs=$(find_all_dirs)
+def valid_dirs(theme_dir):
+    # Find directories in an icon theme matching the target size
+    indexfile = f"{theme_dir}/index.theme"
+    if not os.path.exists(indexfile):
+        return []
 
-# Search for an icon based on its name
-find_icon() {
-    icon=$1
+    # parse the index.theme file
+    entries = ini_parse(indexfile)
+    for subdir in entries["Icon Theme"]["Directories"].rstrip(",").split(","):
+        # "Size" is required
+        Size = int(entries[subdir]["Size"])
+        # FIXME: scaled icons are ignored for now, sorry HiDPI
+        if int(entries[subdir].get("Scale", "1")) != 1:
+            continue
+
+        # defaults if they are not specified
+        Type = entries[subdir].get("Type", "Threshold")
+        MaxSize = int(entries[subdir].get("MaxSize", Size))
+        MinSize = int(entries[subdir].get("MinSize", Size))
+        Threshold = int(entries[subdir].get("Threshold", 2))
+
+        # match subdirectory sizes based on 'Type'
+        if ((Type == "Threshold" and abs(args.icon_size - Size) <= Threshold) or
+                (Type == "Scalable" and MinSize <= args.icon_size <= MaxSize) or
+                (Type == "Fixed" and Size == args.icon_size)):
+            yield f"{theme_dir}/{subdir}"
+
+
+def find_icon_dirs():
+    # Find all directories matching the size and containing icons directly
+    all_dirs = []
+    for datadir in DATA_DIRS:
+        for theme in [args.icon_theme, "hicolor"]:
+            all_dirs.extend(valid_dirs(f"{datadir}/icons/{theme}"))
+    all_dirs.append("/usr/share/pixmaps")
+    return all_dirs
+
+
+def find_icon(icon, fallback):
+    # Search for an icon based on its name
     # find any png, svg or xpm icon in available directories
-    for dir in $all_dirs; do
-        for ext in png svg xpm; do
-            if [ -f "$dir/$icon.$ext" ]; then
-                echo "$dir/$icon.$ext"
-                return
-            fi
-        done
-    done
+    for dir in icon_dirs:
+        for ext in ["png", "svg", "xpm"]:
+            icon_file = f"{dir}/{icon}.{ext}"
+            if os.path.exists(icon_file):
+                return icon_file
     # when the fallback icon is not found, return none instead
-    [ "$icon" = "$FALLBACK_ICON" ] && echo "" || echo "$FALLBACK_ICON"
-}
+    return None if icon == fallback else fallback
 
-# xmenu does not support svg, so convert svg to png
-cache_icon() {
-    icon=$1
 
-    # icon is a existing png/xpm file
-    [ -f "$icon" ] && [ ${icon##*.} != 'svg' ] && echo "$icon" && return
+def gen_entry(entry):
+    Exec = entry.get('Exec')
+    Icon = entry.get('Icon')
+    Name = entry.get('Name')
+    Terminal = entry.get('Terminal')
+    GenericName = entry.get('GenericName')
+    Categories = entry.get('Categories')
 
-    # cache path in $CACHE_ICON_DIR with the flattened name
-    [ -f "$icon" ] && basename=$(echo $icon | tr '/' '_') || basename=${icon##*/}
-    cache_path=$CACHE_ICON_DIR/$basename.png
+    cmd = Exec.replace('%f', '') \
+              .replace('%F', '') \
+              .replace('%u', '') \
+              .replace('%U', '') \
+              .replace('%c', Name) \
+              .replace('%k', entry.get('Path', ''))
+    if Terminal == "true":
+        cmd = f"{args.terminal} -e {cmd}"
 
-    # already cached, skip unless forced to cache again
-    if [ -f "$cache_path" ] && [ -z "$force_cache" ]; then
-        echo "$cache_path" && return
-    fi
+    icon = find_icon(Icon, fallback)
 
-    # find the icon in icon themes if the name is not a path
-    [ -f "$icon" ] && icon_path=$icon || icon_path=$(find_icon "$icon")
+    name = f"{Name} ({GenericName})" if GenericName else Name
 
-    # convert svg -> png
-    if [ "${icon_path##*.}" = "svg" ]; then
-        # first try the fasted, then the slower ones
-        if [ -n "$not_cache" ]; then
-            : # not doing caching in dry run mode
-        elif command -v rsvg-convert > /dev/null; then
-            rsvg-convert -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
-        elif command -v convert > /dev/null; then
-            convert -background none -size "${SIZE}x${SIZE}" "$icon_path" "$cache_path"
-        elif command -v inkscape > /dev/null; then
-            inkscape -w "$SIZE" -h "$SIZE" "$icon_path" -o "$cache_path"
-        else
-            echo >&2 "[Error]: Convert svg icons failed."
-            echo >&2 "Please install one of the following programs:"
-            echo >&2 "rsvg-convert(librsvg), convert(imagemagick), inkscape"
-            exit 1
-        fi
-        echo "$cache_path"
-    else
-        # use png and xpm icons in-place
-        # this could be empty if no fallback icon is found, and it will work
-        echo "$icon_path"
-    fi
-}
+    category = "Others"
+    for c in Categories.rstrip(";").split(";"):
+        if categories.get(c):
+            category = c
 
-FALLBACK_ICON=$(cache_icon "$FALLBACK_ICON")
+    return {"category": category, "icon": icon, "name": name, "cmd": cmd}
 
-# parse the desktop entries and categorize them
-IFS=:
-for datadir in $DATA_DIRS; do unset IFS
-    appdir="$datadir/applications"
-    [ ! -d "$appdir" ] && continue
-    for app in "$appdir"/*.desktop; do
-        unset icon name genname cmd category nodisplay useterm added
-        while IFS="=" read -r key value; do
-            case "$key" in
-            Categories) [ -z "$category" ] && category=$value ;;
-            Icon)       [ -z "$icon" ]     && icon=$(cache_icon "$value") ;;
-            Name)       [ -z "$name" ]     && name="$value" ;;
-            GenericName)[ -z "$genname" ]  && genname=$value ;;
-            Exec)       [ -z "$cmd" ]      && cmd=$value &&
-                        # remove %* place holders
-                        [ "${cmd#*%}" != "$cmd" ] && cmd=$(
-                            echo "$cmd" | sed 's/ %[fFuUick]//g' | sed 's/%%/$/g'
-                        ) ;;
-            NoDisplay)  [ "$value" != "false" ] && nodisplay=1 ;;
-            Terminal)   [ "$value" != "false" ] && useterm=1 ;;
-            # FIXME: show_all not working as it should
-            OnlyShowIn)     [ -z "$SHOW_ALL" ] && nodisplay=1 ;;
-            esac
-        done < "$app"
 
-        [ -n "$nodisplay" ] && continue
-        [ -n "$useterm" ]   && cmd="$TERMINAL -e $cmd"
-        [ -n "$genname" ]   && name="$name ($genname)"
-        icon="${icon-$FALLBACK_ICON}"
-        icon="${icon:+\tIMG:$icon}"
-        item="$icon\t$name\t$cmd"
+def if_show(entry):
+    if (entry.get('Exec') is None or
+            entry.get('NoDisplay') == 'true' or
+            entry.get('Hidden') == 'true' or
+            entry.get('Type') != "Application"):
+        return False
 
-        IFS=\;
-        for c in $category; do unset IFS
-            case "$c" in
-            Audio*|*Video) added=1; Multimedia="$Multimedia$item\n"   ;;
-            Development)   added=1; Development="$Development$item\n" ;;
-            Education)     added=1; Education="$Education$item\n"     ;;
-            Game)          added=1; Games="$Games$item\n"             ;;
-            Graphics)      added=1; Graphics="$Graphics$item\n"       ;;
-            Network)       added=1; Internet="$Internet$item\n"       ;;
-            Office)        added=1; Office="$Office$item\n"           ;;
-            Science)       added=1; Science="$Science$item\n"         ;;
-            Settings)      added=1; Settings="$Settings$item\n"       ;;
-            System)        added=1; System="$System$item\n"           ;;
-            Utility)       added=1; Accessories="$Accessories$item\n" ;;
-            esac
-        done
-        [ -z "$added" ] && Others="$Others$item\n"
-    done
-done
+    if entry.get('TryExec'):
+        TryExec = entry.get('TryExec')
+        if os.path.isabs(TryExec):
+            if os.path.exists(TryExec):
+                return True
+        else:
+            for path in os.getenv("PATH").split(":"):
+                if os.path.exists(os.path.join(path, TryExec)):
+                    return True
+        return False
 
-category_sort() {
-    category_icon=$1
-    category_name=$2
-    category_apps=$3
-    icon=$(cache_icon "$category_icon")
-    # create top level folder
-    printf "${icon:+IMG:$icon\t}%s\n" "$category_name"
-    # sort the applications by their names
-    # FIXME: when icon is missing, name is in first column
-    printf "$category_apps%s" | sort -f -k 2 | uniq
-}
+    if not args.xdg_de:
+        if entry.get('NotShowIn'):
+            for DE in entry.get('NotShowIn').rstrip(';').split(';'):
+                if current_desktops.find(DE) >= 0:
+                    return False
 
-category_sort applications-accessories Accessories "$Accessories"
-category_sort applications-development Development "$Development"
-category_sort applications-education   Education   "$Education"
-category_sort applications-games       Games       "$Games"
-category_sort applications-graphics    Graphics    "$Graphics"
-category_sort applications-internet    Internet    "$Internet"
-category_sort applications-multimedia  Multimedia  "$Multimedia"
-category_sort applications-office      Office      "$Office"
-category_sort applications-science     Science     "$Science"
-category_sort preferences-desktop      Settings    "$Settings"
-category_sort applications-system      System      "$System"
-category_sort applications-other       Others      "$Others"
+        if entry.get('OnlyShowIn'):
+            for DE in entry.get('OnlyShowIn').rstrip(';').split(';'):
+                if current_desktops.find(DE) >= 0:
+                    return True
+            return False
+
+    return True
+
+
+def get_apps():
+    apps = {}
+    for data_dir in DATA_DIRS:
+        app_dir = os.path.join(data_dir, 'applications')
+        # Desktop entry files can be in nested directories
+        for root, dirs, files in os.walk(app_dir):
+            for name in files:
+                if name.endswith('.desktop'):
+                    app = os.path.join(root, name)
+                    app_id = os.path.relpath(app, app_dir).replace('/', '-')
+
+                    # Apps with the same id, choose the first
+                    apps[app_id] = app
+    return apps.values()
+
+
+if __name__ == "__main__":
+    args = get_args()
+    current_desktops = os.getenv('XDG_CURRENT_DESKTOP', '')
+
+    # XDG directories
+    HOME = os.getenv("HOME")
+    XDG_DATA_HOME = os.getenv("XDG_DATA_HOME", f"{HOME}/.local/share")
+    XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
+    DATA_DIRS = [*XDG_DATA_DIRS, XDG_DATA_HOME]
+
+    icon_dirs = find_icon_dirs()
+    fallback = find_icon(args.fallback_icon, None)
+
+    categories = {
+        "AudioVideo": {"name": "Multimedia", "icon": "applications-multimedia"},
+        "Audio": {"name": "Multimedia", "icon": "applications-multimedia"},
+        "Video": {"name": "Multimedia", "icon": "applications-multimedia"},
+        "Development": {"name": "Development", "icon": "applications-development"},
+        "Education": {"name": "Education", "icon": "applications-education"},
+        "Game": {"name": "Games", "icon": "applications-games"},
+        "Graphics": {"name": "Graphics", "icon": "applications-graphics"},
+        "Network": {"name": "Internet", "icon": "applications-internet"},
+        "Office": {"name": "Office", "icon": "applications-office"},
+        "Science": {"name": "Science", "icon": "applications-science"},
+        "Settings": {"name": "Settings", "icon": "preferences-desktop"},
+        "System": {"name": "System", "icon": "applications-system"},
+        "Utility": {"name": "Accessories", "icon": "applications-accessories"},
+        "Others": {"name": "Others", "icon": "applications-other"},
+    }
+
+    menu = {}
+    for app in get_apps():
+        app_parser = ini_parse(app)
+        entry = app_parser["Desktop Entry"]
+        if if_show(entry):
+            item = gen_entry(entry)
+            if menu.get(item["category"]):
+                menu[item["category"]].append(item)
+            else:
+                menu[item["category"]] = [item]
+
+    for category in menu:
+        category_name = categories[category]["name"]
+        category_icon = categories[category]["icon"]
+        icon_file = find_icon(category_icon, fallback)
+        print(f"IMG:{icon_file}\t{category_name}")
+        for item in menu[category]:
+            print("\tIMG:{icon}\t{name}\t{cmd}".format_map(item))
