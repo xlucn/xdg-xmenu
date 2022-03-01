@@ -2,7 +2,7 @@
 
 The current branch is a Python rewrite of previous shell version of `xdg-xmenu`. It's a small python script to generate xdg desktop menu for [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility. This Python version can also launch xmenu directly, due to a little faster execution time.
 
-**Important:** Since Imlib2 1.8.0, svg icons are supported. The python re-write assumes that you have installed the latest Imlib2. So the svg icons are not converted to png anymore, like the shell version. If you don't have the latest Imlib2, use the shell version instead.
+**Important:** Since Imlib2 1.8.0, svg icons are supported (but currently renders at low resolution). The python version assumes that you have installed the latest Imlib2. As a result, the svg icons are not converted to png anymore, unlike the shell version. If you don't have the latest Imlib2, use the shell version instead.
 
 The shell version is in `shell` branch of the git repository.
 
