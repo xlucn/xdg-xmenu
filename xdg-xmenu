@@ -24,7 +24,9 @@ def ini_parse(inifile):
 
 
 def get_args():
-    parser = argparse.ArgumentParser(description="A python rewrite of the shell version")
+    parser = argparse.ArgumentParser(
+        description="Python rewrite of the shell version. "
+        "A script to generate XDG menu for xmenu.")
     parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
                         help='Fallback icon for apps without icons')
     parser.add_argument('-i', '--icon-theme', default="Adwaita",
@@ -210,9 +212,10 @@ if __name__ == "__main__":
                 menu[item["category"]] = [item]
 
     for category in menu:
-        category_name = categories[category]["name"]
-        category_icon = categories[category]["icon"]
-        icon_file = find_icon(category_icon, fallback)
-        print(f"IMG:{icon_file}\t{category_name}")
+        name = categories[category]["name"]
+        icon = categories[category]["icon"]
+        icon = find_icon(icon, fallback)
+        print((f"IMG:{icon}\t" if icon else "") + f"{name}")
         for item in menu[category]:
-            print("\tIMG:{icon}\t{name}\t{cmd}".format_map(item))
+            field_icon = f"\tIMG:{item['icon']}" if item["icon"] else ""
+            print(field_icon + "\t{name}\t{cmd}".format_map(item))
