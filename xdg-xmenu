@@ -6,6 +6,7 @@
 
 import os
 import argparse
+from subprocess import run, PIPE, DEVNULL, Popen
 
 
 def ini_parse(inifile):
@@ -40,8 +41,11 @@ def get_args():
     parser = argparse.ArgumentParser(
         description="Python rewrite of the shell version. "
         "A script to generate XDG menu for xmenu.")
+    parser.add_argument('-a', '--xmenu-args', help='xmenu arguments to pass')
     parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
                         help='Fallback icon for apps without icons, default is %(default)s')
+    parser.add_argument('-d', '--dump', action='store_true',
+                        help='dump generated menu, do not run xmenu')
     parser.add_argument('-i', '--icon-theme', default=None,
                         help='Icon theme for app icons. If not specified, '
                         'default gtk3 settings file (~/.config/gtk-3.0/settings.ini) '
@@ -228,12 +232,28 @@ if __name__ == "__main__":
             else:
                 menu[item["category"]] = [item]
 
+    xdg_menu = ""
     for category in menu:
         menu[category].sort(key=lambda x: x["name"].lower())
         name = categories[category]["name"]
         icon = categories[category]["icon"]
         icon = find_icon(icon, fallback)
-        print((f"IMG:{icon}\t" if icon else "") + f"{name}")
+        xdg_menu += (f"IMG:{icon}\t" if icon else "") + f"{name}\n"
         for item in menu[category]:
             field_icon = f"\tIMG:{item['icon']}" if item["icon"] else ""
-            print(field_icon + "\t{name}\t{cmd}".format_map(item))
+            xdg_menu += field_icon + "\t{name}\t{cmd}\n".format_map(item)
+
+    if args.dump:
+        print(xdg_menu)
+        exit(0)
+
+    xmenu_cmd = ["xmenu"]
+    if args.xmenu_args:
+        xmenu_cmd.extend(args.xmenu_args.split())
+    res = run(xmenu_cmd, stdout=PIPE, stderr=DEVNULL, input=xdg_menu.encode())
+    if res.returncode == 0:
+        output = res.stdout.decode().strip()
+        if not args.dry_run and len(output) > 0:
+            Popen(output)
+        else:
+            print(output)
