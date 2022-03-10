@@ -9,23 +9,26 @@ The shell version is in `shell` branch of the git repository.
 ## Usage
 
 ```
-xdg-xmenu [-b fallback_icon] [-i icon_theme] [-n] [-s icon_size] [-t terminal]
+xdg-xmenu [-h] [-b FALLBACK_ICON] [-d] [-i ICON_THEME] [-I]
+          [-s ICON_SIZE] [-e] [-n] [-t TERMINAL] [-x XMENU_CMD]
 
-Options
-  -b fallback_icon
-      Fallback icon in case one can not be found. Both an icon name and a file
-      path is acceptable. Default is application-x-executable.
-
-  -i icon_theme
-      Icon theme. Default is parsed from gtk3 configuration file.
-
-  -n  Dry run mode. The conversion of svg images will be skipped. In others words,
-      there is no file operations. The menu will still be printed with all the
-      icon paths.
-
-  -s icon_size
-      Icon size. Default is 24.
-
-  -t terminal
-      Terminal emulator to use. Default is xterm.
+options:
+  -h, --help            show this help message and exit
+  -b,--fallback-icon FALLBACK_ICON
+                        Fallback icon for apps without icons, default is
+                        application-x-executable
+  -d, --dump            Dump generated menu, do not run xmenu
+  -i,--icon-theme ICON_THEME
+                        Icon theme for app icons. If not specified, default
+                        gtk3 settings file (~/.config/gtk-3.0/settings.ini)
+                        will be searched for gtk icon theme.
+  -I, --no-icon         Disable icon in xmenu.
+  -s,--icon-size ICON_SIZE
+                        Icon theme for app icons
+  -e, --xdg-de          Show apps according to desktop environments
+  -n, --dry-run         Do not run app, output to stdout
+  -t,--terminal TERMINAL
+                        Terminal emulator to use, default is xterm
+  -x,--xmenu-cmd XMENU_CMD
+                        Xmenu command to use, default is "xmenu"
 ```
