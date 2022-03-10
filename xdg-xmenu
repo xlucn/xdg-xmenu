@@ -23,14 +23,29 @@ def ini_parse(inifile):
     return content
 
 
+def get_gtk_icon_theme(fallback=None):
+    XDG_CONFIG_HOME = os.path.join(os.getenv("HOME"), ".config")
+    XDG_CONFIG_HOME = os.getenv("XDG_CONFIG_HOME", XDG_CONFIG_HOME)
+
+    gtk3_settings = os.path.join(XDG_CONFIG_HOME, "gtk-3.0", "settings.ini")
+    if os.path.exists(gtk3_settings):
+        entries = ini_parse(gtk3_settings)
+        settings = entries.get("Settings")
+        if settings:
+            return settings.get("gtk-icon-theme-name", fallback)
+    return fallback
+
+
 def get_args():
     parser = argparse.ArgumentParser(
         description="Python rewrite of the shell version. "
         "A script to generate XDG menu for xmenu.")
     parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
-                        help='Fallback icon for apps without icons')
-    parser.add_argument('-i', '--icon-theme', default="Adwaita",
-                        help='Icon theme for app icons')
+                        help='Fallback icon for apps without icons, default is %(default)s')
+    parser.add_argument('-i', '--icon-theme', default=None,
+                        help='Icon theme for app icons. If not specified, '
+                        'default gtk3 settings file (~/.config/gtk-3.0/settings.ini) '
+                        'will be searched for gtk icon theme.')
     parser.add_argument('-s', '--icon-size', type=int, default=24,
                         help='Icon theme for app icons')
     parser.add_argument('-e', '--xdg-de', action='store_true',
@@ -172,6 +187,8 @@ def get_apps():
 
 if __name__ == "__main__":
     args = get_args()
+    if args.icon_theme is None:
+        args.icon_theme = get_gtk_icon_theme("Adwaita")
     current_desktops = os.getenv('XDG_CURRENT_DESKTOP', '')
 
     # XDG directories
