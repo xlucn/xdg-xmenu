@@ -212,6 +212,7 @@ if __name__ == "__main__":
                 menu[item["category"]] = [item]
 
     for category in menu:
+        menu[category].sort(key=lambda x: x["name"].lower())
         name = categories[category]["name"]
         icon = categories[category]["icon"]
         icon = find_icon(icon, fallback)
