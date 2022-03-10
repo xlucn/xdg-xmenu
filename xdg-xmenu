@@ -44,18 +44,20 @@ def get_args():
     parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
                         help='Fallback icon for apps without icons, default is %(default)s')
     parser.add_argument('-d', '--dump', action='store_true',
-                        help='dump generated menu, do not run xmenu')
+                        help='Dump generated menu, do not run xmenu')
     parser.add_argument('-i', '--icon-theme', default=None,
                         help='Icon theme for app icons. If not specified, '
                         'default gtk3 settings file (~/.config/gtk-3.0/settings.ini) '
                         'will be searched for gtk icon theme.')
+    parser.add_argument('-I', '--no-icon', action='store_true',
+                        help='Disable icon in xmenu.')
     parser.add_argument('-s', '--icon-size', type=int, default=24,
                         help='Icon theme for app icons')
     parser.add_argument('-e', '--xdg-de', action='store_true',
                         help='Show apps according to desktop environments')
     parser.add_argument('-n', '--dry-run', action='store_true',
                         help='Do not run app, output to stdout')
-    parser.add_argument('-t', '--terminal', metavar='terminal', default='xterm',
+    parser.add_argument('-t', '--terminal', default='xterm',
                         help='Terminal emulator to use, default is %(default)s')
     parser.add_argument('-x', '--xmenu-cmd', default='xmenu',
                         help='Xmenu command to use, default is "%(default)s"')
@@ -195,8 +197,9 @@ def main():
     XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
     DATA_DIRS = [*XDG_DATA_DIRS, XDG_DATA_HOME]
 
-    icon_dirs = find_icon_dirs(DATA_DIRS, args.icon_theme, args.icon_size)
-    fallback = find_icon(icon_dirs, args.fallback_icon, None)
+    if not args.no_icon:
+        icon_dirs = find_icon_dirs(DATA_DIRS, args.icon_theme, args.icon_size)
+        fallback = find_icon(icon_dirs, args.fallback_icon, None)
 
     categories = {
         "AudioVideo": {"name": "Multimedia", "icon": "applications-multimedia"},
@@ -222,7 +225,10 @@ def main():
         check_desktops = current_desktops if args.xdg_de else None
         if if_show(entry, check_desktops):
             item = gen_entry(entry, args.terminal)
-            item['icon'] = find_icon(icon_dirs, item['icon'], fallback)
+            if not args.no_icon:
+                item['icon'] = find_icon(icon_dirs, item['icon'], fallback)
+            else:
+                item['icon'] = None
 
             category = "Others"
             for c in item['categories'].rstrip(";").split(";"):
@@ -239,7 +245,7 @@ def main():
         menu[category].sort(key=lambda x: x["name"].lower())
         name = categories[category]["name"]
         icon = categories[category]["icon"]
-        icon = find_icon(icon_dirs, icon, fallback)
+        icon = None if args.no_icon else find_icon(icon_dirs, icon, fallback)
         xdg_menu += (f"IMG:{icon}\t" if icon else "") + f"{name}\n"
         for item in menu[category]:
             field_icon = f"\tIMG:{item['icon']}" if item["icon"] else ""
@@ -250,6 +256,8 @@ def main():
         exit(0)
 
     xmenu_cmd = args.xmenu_cmd.split()
+    if args.no_icon:
+        xmenu_cmd.append("-i")
     res = run(xmenu_cmd, stdout=PIPE, stderr=DEVNULL, input=xdg_menu.encode())
     if res.returncode == 0:
         output = res.stdout.decode().strip()
