@@ -230,7 +230,7 @@ def main():
             else:
                 item['icon'] = None
 
-            category = "Others"
+            item['category'] = "Others"
             for c in item['categories'].rstrip(";").split(";"):
                 if categories.get(c):
                     item['category'] = c
