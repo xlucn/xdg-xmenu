@@ -41,7 +41,6 @@ def get_args():
     parser = argparse.ArgumentParser(
         description="Python rewrite of the shell version. "
         "A script to generate XDG menu for xmenu.")
-    parser.add_argument('-a', '--xmenu-args', help='xmenu arguments to pass')
     parser.add_argument('-b', '--fallback-icon', default="application-x-executable",
                         help='Fallback icon for apps without icons, default is %(default)s')
     parser.add_argument('-d', '--dump', action='store_true',
@@ -58,6 +57,8 @@ def get_args():
                         help='Do not run app, output to stdout')
     parser.add_argument('-t', '--terminal', metavar='terminal', default='xterm',
                         help='Terminal emulator to use, default is %(default)s')
+    parser.add_argument('-x', '--xmenu-cmd', default='xmenu',
+                        help='Xmenu command to use, default is "%(default)s"')
     return parser.parse_args()
 
 
@@ -248,9 +249,7 @@ def main():
         print(xdg_menu)
         exit(0)
 
-    xmenu_cmd = ["xmenu"]
-    if args.xmenu_args:
-        xmenu_cmd.extend(args.xmenu_args.split())
+    xmenu_cmd = args.xmenu_cmd.split()
     res = run(xmenu_cmd, stdout=PIPE, stderr=DEVNULL, input=xdg_menu.encode())
     if res.returncode == 0:
         output = res.stdout.decode().strip()
