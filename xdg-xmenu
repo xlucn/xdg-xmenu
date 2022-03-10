@@ -61,7 +61,7 @@ def get_args():
     return parser.parse_args()
 
 
-def valid_dirs(theme_dir):
+def valid_dirs(theme_dir, icon_size):
     # Find directories in an icon theme matching the target size
     indexfile = f"{theme_dir}/index.theme"
     if not os.path.exists(indexfile):
@@ -83,23 +83,23 @@ def valid_dirs(theme_dir):
         Threshold = int(entries[subdir].get("Threshold", 2))
 
         # match subdirectory sizes based on 'Type'
-        if ((Type == "Threshold" and abs(args.icon_size - Size) <= Threshold) or
-                (Type == "Scalable" and MinSize <= args.icon_size <= MaxSize) or
-                (Type == "Fixed" and Size == args.icon_size)):
+        if ((Type == "Threshold" and abs(icon_size - Size) <= Threshold) or
+                (Type == "Scalable" and MinSize <= icon_size <= MaxSize) or
+                (Type == "Fixed" and Size == icon_size)):
             yield f"{theme_dir}/{subdir}"
 
 
-def find_icon_dirs():
+def find_icon_dirs(data_dirs, icon_theme, icon_size):
     # Find all directories matching the size and containing icons directly
     all_dirs = []
-    for datadir in DATA_DIRS:
-        for theme in [args.icon_theme, "hicolor"]:
-            all_dirs.extend(valid_dirs(f"{datadir}/icons/{theme}"))
+    for datadir in data_dirs:
+        for theme in [icon_theme, "hicolor"]:
+            all_dirs.extend(valid_dirs(f"{datadir}/icons/{theme}", icon_size))
     all_dirs.append("/usr/share/pixmaps")
     return all_dirs
 
 
-def find_icon(icon, fallback):
+def find_icon(icon_dirs, icon, fallback):
     # Search for an icon based on its name
     # find any png, svg or xpm icon in available directories
     for dir in icon_dirs:
@@ -111,7 +111,7 @@ def find_icon(icon, fallback):
     return None if icon == fallback else fallback
 
 
-def gen_entry(entry):
+def gen_entry(entry, terminal):
     Exec = entry.get('Exec')
     Icon = entry.get('Icon')
     Name = entry.get('Name')
@@ -126,21 +126,14 @@ def gen_entry(entry):
               .replace('%c', Name) \
               .replace('%k', entry.get('Path', ''))
     if Terminal == "true":
-        cmd = f"{args.terminal} -e {cmd}"
-
-    icon = find_icon(Icon, fallback)
+        cmd = f"{terminal} -e {cmd}"
 
     name = f"{Name} ({GenericName})" if GenericName else Name
 
-    category = "Others"
-    for c in Categories.rstrip(";").split(";"):
-        if categories.get(c):
-            category = c
-
-    return {"category": category, "icon": icon, "name": name, "cmd": cmd}
+    return {"categories": Categories, "icon": Icon, "name": name, "cmd": cmd}
 
 
-def if_show(entry):
+def if_show(entry, check_desktops=''):
     if (entry.get('Exec') is None or
             entry.get('NoDisplay') == 'true' or
             entry.get('Hidden') == 'true' or
@@ -158,24 +151,24 @@ def if_show(entry):
                     return True
         return False
 
-    if not args.xdg_de:
+    if check_desktops:
         if entry.get('NotShowIn'):
             for DE in entry.get('NotShowIn').rstrip(';').split(';'):
-                if current_desktops.find(DE) >= 0:
+                if check_desktops.find(DE) >= 0:
                     return False
 
         if entry.get('OnlyShowIn'):
             for DE in entry.get('OnlyShowIn').rstrip(';').split(';'):
-                if current_desktops.find(DE) >= 0:
+                if check_desktops.find(DE) >= 0:
                     return True
             return False
 
     return True
 
 
-def get_apps():
+def get_apps(data_dirs):
     apps = {}
-    for data_dir in DATA_DIRS:
+    for data_dir in data_dirs:
         app_dir = os.path.join(data_dir, 'applications')
         # Desktop entry files can be in nested directories
         for root, dirs, files in os.walk(app_dir):
@@ -189,7 +182,7 @@ def get_apps():
     return apps.values()
 
 
-if __name__ == "__main__":
+def main():
     args = get_args()
     if args.icon_theme is None:
         args.icon_theme = get_gtk_icon_theme("Adwaita")
@@ -201,8 +194,8 @@ if __name__ == "__main__":
     XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
     DATA_DIRS = [*XDG_DATA_DIRS, XDG_DATA_HOME]
 
-    icon_dirs = find_icon_dirs()
-    fallback = find_icon(args.fallback_icon, None)
+    icon_dirs = find_icon_dirs(DATA_DIRS, args.icon_theme, args.icon_size)
+    fallback = find_icon(icon_dirs, args.fallback_icon, None)
 
     categories = {
         "AudioVideo": {"name": "Multimedia", "icon": "applications-multimedia"},
@@ -222,11 +215,19 @@ if __name__ == "__main__":
     }
 
     menu = {}
-    for app in get_apps():
+    for app in get_apps(DATA_DIRS):
         app_parser = ini_parse(app)
         entry = app_parser["Desktop Entry"]
-        if if_show(entry):
-            item = gen_entry(entry)
+        check_desktops = current_desktops if args.xdg_de else None
+        if if_show(entry, check_desktops):
+            item = gen_entry(entry, args.terminal)
+            item['icon'] = find_icon(icon_dirs, item['icon'], fallback)
+
+            category = "Others"
+            for c in item['categories'].rstrip(";").split(";"):
+                if categories.get(c):
+                    item['category'] = c
+
             if menu.get(item["category"]):
                 menu[item["category"]].append(item)
             else:
@@ -237,7 +238,7 @@ if __name__ == "__main__":
         menu[category].sort(key=lambda x: x["name"].lower())
         name = categories[category]["name"]
         icon = categories[category]["icon"]
-        icon = find_icon(icon, fallback)
+        icon = find_icon(icon_dirs, icon, fallback)
         xdg_menu += (f"IMG:{icon}\t" if icon else "") + f"{name}\n"
         for item in menu[category]:
             field_icon = f"\tIMG:{item['icon']}" if item["icon"] else ""
@@ -254,6 +255,10 @@ if __name__ == "__main__":
     if res.returncode == 0:
         output = res.stdout.decode().strip()
         if not args.dry_run and len(output) > 0:
-            Popen(output)
+            Popen(output, stdout=DEVNULL, stderr=DEVNULL)
         else:
             print(output)
+
+
+if __name__ == "__main__":
+    main()
