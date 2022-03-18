@@ -6,6 +6,7 @@
 
 import os
 import argparse
+import shlex
 from subprocess import run, PIPE, DEVNULL, Popen
 
 
@@ -262,7 +263,7 @@ def main():
     if res.returncode == 0:
         output = res.stdout.decode().strip()
         if not args.dry_run and len(output) > 0:
-            Popen(output, stdout=DEVNULL, stderr=DEVNULL)
+            Popen(shlex.split(output), stdout=DEVNULL, stderr=DEVNULL)
         else:
             print(output)
 
