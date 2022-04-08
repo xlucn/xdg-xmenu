@@ -176,6 +176,7 @@ IFS=:
 for datadir in $DATA_DIRS; do unset IFS
     appdir="$datadir/applications"
     [ ! -d "$appdir" ] && continue
+    [ ! "$(find "$appdir" -name "*.desktop")" ] && continue
     for app in "$appdir"/*.desktop; do
         unset icon name genname cmd category nodisplay useterm added
         while IFS="=" read -r key value; do
