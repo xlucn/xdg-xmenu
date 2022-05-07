@@ -8,7 +8,7 @@ This script is only a toy project and I have not tested it outside of my own mac
 
 ## Requirement
 
-**Update:** Since Imlib2 1.8.0, svg images can be rendered directly, so the following caching can be skipped. Recent `xdg-xmenu` provides a `-S` option to use the svg paths, see usage below.
+**Update:** Since Imlib2 1.8.0, svg images can be rendered directly, so the following caching can be skipped. Recent `xdg-xmenu` provides a `-S` option to use the svg icons directly, see usage below.
 
 The script will look for icons loosely according to [freedesktop specification](https://specifications.freedesktop.org). If the icons found are svg images, which is very possible, you will need any one of the following tools (sorted by priority) to convert svg images to pngs:
 
@@ -21,7 +21,7 @@ The generated png images will be cached to `~/.cache/xdg-xmenu/icons` folder. As
 ## Usage
 
 ```
-xdg-xmenu [-a] [-b fallback_icon] [-f] [-i icon_theme] [-n] [-s icon_size] [-t terminal]
+xdg-xmenu [-a] [-b fallback_icon] [-E] [-f] [-i icon_theme] [-n] [-s icon_size] [-S] [-t terminal]
 
 Options
   -a  Show icons with `OnlyShowIn' key in .desktop file. These desktop entries are
@@ -31,6 +31,9 @@ Options
   -b fallback_icon
       Fallback icon in case one can not be found. Both an icon name and a file
       path is acceptable. Default is application-x-executable.
+
+  -E  Show empty categories even if there are no apps. Default is to hide
+      those categories.
 
   -f  Force to cache svg icons to png, even if cached images already exist. Useful
       when switching to a new icon theme.
