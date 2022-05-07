@@ -10,6 +10,7 @@ xdg\-xmenu
 [\fB\-i \fIicon_theme\fR]
 [\fB\-n\fR]
 [\fB\-s \fIicon_size\fR]
+[\fB\-S\fR]
 [\fB\-t \fIterminal\fR]
 .SH DESCRIPTION
 xdg-xmenu is a shell script to generate an XDG desktop menu file for xmenu.
@@ -31,6 +32,7 @@ when switching to a new icon theme.
 .TP
 \fB\-i \fIicon_theme\fR
 Icon theme. Default is parsed from gtk3 configuration file.
+.TP
 \fB\-n\fR
 Dry run mode. The conversion of svg images will be skipped. In others words,
 there is no file operations. The menu will still be printed with all the
@@ -38,6 +40,9 @@ icon paths.
 .TP
 \fB\-s \fIicon_size\fR
 Icon size. Default is 24 if not specified.
+.TP
+\fB\-S\fR
+Do not cache svg icons as png images. Recommended for Imlib2 1.8.0 and later.
 .TP
 \fB\-t \fIterminal\fR
 Terminal emulator to use. Default is xterm.
