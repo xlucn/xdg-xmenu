@@ -24,17 +24,18 @@ ICON_THEME=${XDG_MENU_ICON_THEME:-$(
 FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
 # Read CLI arguments
-while getopts "ab:fhi:ns:St:" arg; do
+while getopts "ab:Efhi:ns:St:" arg; do
     case "$arg" in
         a) SHOW_ALL=1;;
         b) FALLBACK_ICON=$OPTARG;;
+        E) empty_categories=1;;
         f) force_cache=1;;
         i) ICON_THEME=$OPTARG;;
         n) not_cache=1;;
         s) SIZE=$OPTARG;;
         S) no_svg_cache=1;;
         t) TERMINAL=$OPTARG;;
-        h|*) echo "$0 [-afnS] [-b icon] [-i theme] [-s size] [-t term]" && exit ;;
+        h|*) echo "$0 [-aEfnS] [-b icon] [-i theme] [-s size] [-t term]" && exit ;;
     esac
 done
 
@@ -228,6 +229,8 @@ category_sort() {
     category_icon=$1
     category_name=$2
     category_apps=$3
+    # Empty categories
+    [ -z "$empty_categories" ] && [ -z "$category_apps" ] && return
     icon=$(cache_icon "$category_icon")
     # create top level folder
     printf "${icon:+IMG:$icon\t}%s\n" "$category_name"

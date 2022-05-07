@@ -6,6 +6,7 @@ xdg-xmenu - generate desktop menu file for
 xdg\-xmenu
 [\fB\-a\fR]
 [\fB\-b \fIfallback_font\fR]
+[\fB\-E\fR]
 [\fB\-f\fR]
 [\fB\-i \fIicon_theme\fR]
 [\fB\-n\fR]
@@ -25,6 +26,10 @@ Default is not showing those desktop entries.
 Fallback icon in case one can not be found.
 Both an icon name and a file path is acceptable.
 Default is application-x-executable.
+.TP
+\fB\-E\fR
+Show empty categories even if there are no apps. Default is to hide
+those categories.
 .TP
 \fB\-f\fR
 Force to cache svg icons to png, even if cached images already exist. Useful
