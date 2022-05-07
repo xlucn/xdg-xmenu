@@ -1,3 +1,11 @@
+0.4.1
+
+Changed:
+- Hide empty categories by default, turn them on with -E option. #7
+
+Fixed:
+- Check for empty desktop entry folders. #6
+
 0.4.0
 
 Added:
