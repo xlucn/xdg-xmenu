@@ -1,9 +1,10 @@
-0.4.2
+0.4.2 2022-05-20
 
 Added:
 - Option -G to hide app's generic name.
 
-0.4.1
+
+0.4.1 2022-05-07
 
 Changed:
 - Hide empty categories by default, turn them on with -E option. #7
@@ -11,7 +12,8 @@ Changed:
 Fixed:
 - Check for empty desktop entry folders. #6
 
-0.4.0
+
+0.4.0 2022-03-01
 
 Added:
 - Option to use svg icons without cache, supported by Imlib2 1.8.0
@@ -19,7 +21,8 @@ Added:
 Fixed:
 - Threshold checking
 
-0.3.1
+
+0.3.1 2021-10-01
 
 Fixed:
 - Better size matching following the specification
