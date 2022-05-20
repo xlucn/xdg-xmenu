@@ -46,18 +46,18 @@ def get_args():
                         help='Fallback icon for apps without icons, default is %(default)s')
     parser.add_argument('-d', '--dump', action='store_true',
                         help='Dump generated menu, do not run xmenu')
-    parser.add_argument('-i', '--icon-theme', default=None,
-                        help='Icon theme for app icons. If not specified, '
-                        'default gtk3 settings file (~/.config/gtk-3.0/settings.ini) '
-                        'will be searched for gtk icon theme.')
-    parser.add_argument('-I', '--no-icon', action='store_true',
-                        help='Disable icon in xmenu.')
-    parser.add_argument('-s', '--icon-size', type=int, default=24,
-                        help='Icon theme for app icons')
     parser.add_argument('-e', '--xdg-de', action='store_true',
                         help='Show apps according to desktop environments')
+    parser.add_argument('-G', '--no-genname', action='store_true',
+                        help='Do not show generic name of the app')
+    parser.add_argument('-i', '--icon-theme', default=None,
+                        help='Icon theme for app icons. Default to gtk3 settings.')
+    parser.add_argument('-I', '--no-icon', action='store_true',
+                        help='Disable icon in xmenu.')
     parser.add_argument('-n', '--dry-run', action='store_true',
                         help='Do not run app, output to stdout')
+    parser.add_argument('-s', '--icon-size', type=int, default=24,
+                        help='Icon theme for app icons')
     parser.add_argument('-t', '--terminal', default='xterm',
                         help='Terminal emulator to use, default is %(default)s')
     parser.add_argument('-x', '--xmenu-cmd', default='xmenu',
@@ -115,7 +115,7 @@ def find_icon(icon_dirs, icon, fallback):
     return None if icon == fallback else fallback
 
 
-def gen_entry(entry, terminal):
+def gen_entry(entry, terminal, no_genname):
     Exec = entry.get('Exec')
     Icon = entry.get('Icon')
     Name = entry.get('Name')
@@ -132,7 +132,9 @@ def gen_entry(entry, terminal):
     if Terminal == "true":
         cmd = f"{terminal} -e {cmd}"
 
-    name = f"{Name} ({GenericName})" if GenericName else Name
+    name = Name
+    if GenericName and not no_genname:
+        name = f"{name} ({GenericName})"
 
     return {"categories": Categories, "icon": Icon, "name": name, "cmd": cmd}
 
@@ -225,7 +227,7 @@ def main():
         entry = app_parser["Desktop Entry"]
         check_desktops = current_desktops if args.xdg_de else None
         if if_show(entry, check_desktops):
-            item = gen_entry(entry, args.terminal)
+            item = gen_entry(entry, args.terminal, args.no_genname)
             if not args.no_icon:
                 item['icon'] = find_icon(icon_dirs, item['icon'], fallback)
             else:
