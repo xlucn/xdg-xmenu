@@ -24,18 +24,19 @@ ICON_THEME=${XDG_MENU_ICON_THEME:-$(
 FALLBACK_ICON=${XDG_MENU_FALLBACK_ICON:-application-x-executable}
 
 # Read CLI arguments
-while getopts "ab:Efhi:ns:St:" arg; do
+while getopts "ab:EGfhi:ns:St:" arg; do
     case "$arg" in
         a) SHOW_ALL=1;;
         b) FALLBACK_ICON=$OPTARG;;
         E) empty_categories=1;;
         f) force_cache=1;;
+        G) no_genname=1;;
         i) ICON_THEME=$OPTARG;;
         n) not_cache=1;;
         s) SIZE=$OPTARG;;
         S) no_svg_cache=1;;
         t) TERMINAL=$OPTARG;;
-        h|*) echo "$0 [-aEfnS] [-b icon] [-i theme] [-s size] [-t term]" && exit ;;
+        h|*) echo "$0 [-aEfGnS] [-b icon] [-i theme] [-s size] [-t term]" && exit ;;
     esac
 done
 
@@ -200,7 +201,7 @@ for datadir in $DATA_DIRS; do unset IFS
 
         [ -n "$nodisplay" ] && continue
         [ -n "$useterm" ]   && cmd="$TERMINAL -e $cmd"
-        [ -n "$genname" ]   && name="$name ($genname)"
+        [ -n "$genname" ]   && [ -z "$no_genname" ] && name="$name ($genname)"
         icon="${icon-$FALLBACK_ICON}"
         icon="${icon:+\tIMG:$icon}"
         item="$icon\t$name\t$cmd"

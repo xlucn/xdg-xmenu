@@ -21,7 +21,7 @@ The generated png images will be cached to `~/.cache/xdg-xmenu/icons` folder. As
 ## Usage
 
 ```
-xdg-xmenu [-a] [-b fallback_icon] [-E] [-f] [-i icon_theme] [-n] [-s icon_size] [-S] [-t terminal]
+xdg-xmenu [-a] [-b fallback_icon] [-E] [-f] [-G] [-i icon_theme] [-n] [-s icon_size] [-S] [-t terminal]
 
 Options
   -a  Show icons with `OnlyShowIn' key in .desktop file. These desktop entries are
@@ -34,6 +34,8 @@ Options
 
   -E  Show empty categories even if there are no apps. Default is to hide
       those categories.
+
+  -G  Do not show app's generic name.
 
   -f  Force to cache svg icons to png, even if cached images already exist. Useful
       when switching to a new icon theme.
