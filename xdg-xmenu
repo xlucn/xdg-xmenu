@@ -7,6 +7,7 @@
 import os
 import argparse
 import shlex
+import shutil
 from subprocess import run, PIPE, DEVNULL, Popen
 
 
@@ -147,14 +148,8 @@ def if_show(entry, check_desktops=''):
         return False
 
     if entry.get('TryExec'):
-        TryExec = entry.get('TryExec')
-        if os.path.isabs(TryExec):
-            if os.path.exists(TryExec):
-                return True
-        else:
-            for path in os.getenv("PATH").split(":"):
-                if os.path.exists(os.path.join(path, TryExec)):
-                    return True
+        if shutil.which(entry['TryExec']):
+            return True
         return False
 
     if check_desktops:
