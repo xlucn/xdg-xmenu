@@ -10,6 +10,11 @@ import shlex
 import shutil
 from subprocess import run, PIPE, DEVNULL, Popen
 
+HOME = os.getenv("HOME")
+XDG_DATA_HOME = os.getenv("XDG_DATA_HOME", f"{HOME}/.local/share")
+XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
+DATA_DIRS = [*XDG_DATA_DIRS, XDG_DATA_HOME]
+XDG_CURRENT_DESKTOP = os.getenv('XDG_CURRENT_DESKTOP', '')
 
 def ini_parse(inifile):
     '''
@@ -190,13 +195,6 @@ def main():
     args = get_args()
     if args.icon_theme is None:
         args.icon_theme = get_gtk_icon_theme("Adwaita")
-    current_desktops = os.getenv('XDG_CURRENT_DESKTOP', '')
-
-    # XDG directories
-    HOME = os.getenv("HOME")
-    XDG_DATA_HOME = os.getenv("XDG_DATA_HOME", f"{HOME}/.local/share")
-    XDG_DATA_DIRS = os.getenv("XDG_DATA_DIRS", "/usr/share:/usr/local/share").split(":")
-    DATA_DIRS = [*XDG_DATA_DIRS, XDG_DATA_HOME]
 
     if not args.no_icon:
         icon_dirs = find_icon_dirs(DATA_DIRS, args.icon_theme, args.icon_size)
