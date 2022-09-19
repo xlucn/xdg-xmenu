@@ -12,17 +12,20 @@ from subprocess import run, PIPE, DEVNULL, Popen
 
 
 def ini_parse(inifile):
+    '''
+    ConfigParser is a bit slow if you want instant menu generation
+    '''
     content = {}
     section = None
 
     for line in open(inifile):
-        if line[0] == '[' and line[-2] == ']':
-            section = line[1:-2]
+        line = line.strip()
+        if line.startswith('[') and line.endswith(']'):
+            section = line.strip('[]')
             content[section] = {}
         elif line.find("=") >= 0 and section:
-            key, sep, value = line.partition("=")
+            key, _, value = line.partition("=")
             content[section][key.strip()] = value.strip()
-
     return content
 
 
