@@ -22,15 +22,16 @@ char *PATH, *HOME, *XDG_DATA_HOME, *XDG_DATA_DIRS, *XDG_CONFIG_HOME, *XDG_CURREN
 
 struct Option {
 	char *fallback_icon;
-	int dump;
-	int xdg_de;
-	int no_genname;
 	char *icon_theme;
-	int no_icon;
-	int dry_run;
-	int icon_size;
 	char *terminal;
 	char *xmenu_cmd;
+	int dry_run;
+	int dump;
+	int icon_size;
+	int no_genname;
+	int no_icon;
+	int scale;
+	int xdg_de;
 } option = {
 	.fallback_icon = "application-x-executable",
 	.icon_size = 24,
@@ -106,6 +107,7 @@ const char *usage_str =
 	"  -I          Disable icon in xmenu.\n"
 	"  -n          Do not run app, output to stdout\n"
 	"  -s SIZE     Icon theme for app icons\n"
+	"  -S SCALE    Icon size scale factor, work with HiDPI screens\n"
 	"  -t TERMINAL Terminal emulator to use, default is xterm\n"
 	"  -x CMD      Xmenu command to use, default is xmenu\n";
 
@@ -245,43 +247,20 @@ int main (int argc, char *argv[])
 	XDG_CURRENT_DESKTOP = getenv("XDG_CURRENT_DESKTOP");
 
 	int c;
-	while ((c = getopt(argc, argv, "b:deGhi:Ins:t:x:")) != -1) {
+	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
 		switch (c) {
-			case 'b':
-				option.fallback_icon = optarg;
-				break;
-			case 'd':
-				option.dump = 1;
-				break;
-			case 'e':
-				option.xdg_de = 1;
-				break;
-			case 'G':
-				option.no_genname = 1;
-				break;
-			case 'i':
-				option.icon_theme = optarg;
-				break;
-			case 'I':
-				option.no_icon = 1;
-				break;
-			case 'n':
-				option.dry_run = 1;
-				break;
-			case 's':
-				option.icon_size = atoi(optarg);
-				break;
-			case 't':
-				option.terminal = optarg;
-				break;
-			case 'x':
-				option.xmenu_cmd = optarg;
-				break;
-			case 'h':
-			default:
-				puts(usage_str);
-				exit(0);
-				break;
+			case 'b': option.fallback_icon = optarg; break;
+			case 'd': option.dump = 1; break;
+			case 'e': option.xdg_de = 1; break;
+			case 'G': option.no_genname = 1; break;
+			case 'i': option.icon_theme = optarg; break;
+			case 'I': option.no_icon = 1; break;
+			case 'n': option.dry_run = 1; break;
+			case 's': option.icon_size = atoi(optarg); break;
+			case 'S': option.scale = atoi(optarg); break;
+			case 't': option.terminal = optarg; break;
+			case 'x': option.xmenu_cmd = optarg; break;
+			case 'h': default: puts(usage_str); exit(0); break;
 		}
 	}
 
