@@ -289,7 +289,29 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 	return 1;
 }
 
-int main (int argc, char *argv[])
+int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value) {
+	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
+		strcpy(user, value);
+	return 1;
+}
+
+void get_gtk_icon_theme(char *buffer, const char *fallback) {
+	int res;
+	char gtk3_settings[256] = {0}, *real_path;
+
+	sprintf(gtk3_settings, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
+	if (access(gtk3_settings, F_OK) == 0) {
+		real_path = realpath(gtk3_settings, NULL);
+		if ((res = ini_parse(real_path, get_gtk_icon_theme_handler, buffer)) < 0)
+			printf("failed parse gtk settings\n");
+		free(real_path);
+	}
+
+	if (strlen(buffer) == 0)
+		strcpy(buffer, fallback);
+}
+
+int main(int argc, char *argv[])
 {
 	/* FIXME: fallback values */
 	PATH = getenv("PATH");
@@ -320,7 +342,7 @@ int main (int argc, char *argv[])
 	int if_show_flag, res;
 	App app;
 	MenuEntry menuentry;
-	char *folder = "/usr/share/applications", path[LLEN];
+	char *folder = "/usr/share/applications", path[LLEN], icon_theme[64] = {0};
 	DIR *dir;
 	struct dirent *entry;
 
@@ -356,6 +378,9 @@ int main (int argc, char *argv[])
 		fprintf(stderr, "Desktop file parse failed: %d\n", res);
 	/* a hack to process the end of file */
 	match_icon_subdir(NULL, "", NULL, NULL);
+
+	get_gtk_icon_theme(icon_theme, "hicolor");
+	printf("icon theme: (%s)\n", icon_theme);
 
 	return 0;
 }
