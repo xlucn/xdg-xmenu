@@ -35,6 +35,7 @@ struct Option {
 } option = {
 	.fallback_icon = "application-x-executable",
 	.icon_size = 24,
+	.scale = 1,
 	.terminal = "xterm",
 	.xmenu_cmd = "xmenu"
 };
@@ -233,7 +234,59 @@ void gen_entry(App *app, MenuEntry *entry) {
 	sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
 }
 
-void match_dirs_in_theme(char *icon_theme, int icon_size) {
+/*
+ * handler for ini_parse
+ * match subdirectories in an icon theme folder by parsing an index.theme file
+ * - the icon size is options.icon_size
+ * - the icon theme will be specified as the parsed the index.theme file
+ */
+int match_icon_subdir(void *user, const char *section, const char *name, const char *value) {
+	/* static variables to preserve between function calls */
+	static char subdir[32], type[16];
+	static int size, minsize, maxsize, threshold, scale;
+
+	if (strcmp(section, subdir) != 0 || (!name && !value)) {
+		/* Check the icon size after finished parsing a section */
+		if (scale == option.scale)
+			if (((strlen(type) == 0 || strcmp(type, "Threshold") == 0)
+					&& abs(size - option.icon_size) <= threshold)
+				|| (strcmp(type, "Fixed") == 0
+					&& size == option.icon_size)
+				|| (strcmp(type, "Scalable") == 0
+					&& minsize <= option.icon_size
+					&& maxsize >= option.icon_size))
+				printf("%s\n", subdir);
+
+		/* reset the current section */
+		strncpy(subdir, section, 32);
+		size = minsize = maxsize = -1;
+		threshold = 2;  /* threshold fallback value */
+		scale = 1;
+		memset(type, 0, 16);
+	}
+
+	/* save the values into those static variables */
+	if (!name && !value) { /* end of the file/section */
+		return 1;
+	} else if (strcmp(name, "Size") == 0) {
+		size = atoi(value);
+		if (minsize == -1)  /* minsize fallback value */
+			minsize = size;
+		if (maxsize == -1)  /* maxsize fallback value */
+			maxsize = size;
+	} else if (strcmp(name, "MinSize") == 0) {
+		minsize = atoi(value);
+	} else if (strcmp(name, "MaxSize") == 0) {
+		maxsize = atoi(value);
+	} else if (strcmp(name, "Threshold") == 0) {
+		threshold = atoi(value);
+	} else if (strcmp(name, "Scale") == 0) {
+		scale = atoi(value);
+	} else if (strcmp(name, "Type") == 0) {
+		strncpy(type, value, 16);
+	}
+
+	return 1;
 }
 
 int main (int argc, char *argv[])
@@ -263,9 +316,6 @@ int main (int argc, char *argv[])
 			case 'h': default: puts(usage_str); exit(0); break;
 		}
 	}
-
-	char *icon_folder = "/usr/share/icons/Papirus-Dark/";
-	match_dirs_in_theme(icon_folder, 48);
 
 	int if_show_flag, res;
 	App app;
@@ -300,6 +350,12 @@ int main (int argc, char *argv[])
 
 	if (dir)
 		closedir(dir);
+
+	char *index_theme = "/usr/share/icons/Adwaita/index.theme";
+	if ((res = ini_parse(index_theme, match_icon_subdir, NULL)) < 0)
+		fprintf(stderr, "Desktop file parse failed: %d\n", res);
+	/* a hack to process the end of file */
+	match_icon_subdir(NULL, "", NULL, NULL);
 
 	return 0;
 }
