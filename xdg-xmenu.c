@@ -120,7 +120,8 @@ char *exts[] = {"svg", "png", "xpm"};
 char fallback_icon_path[MLEN];
 Directories *all_dirs;
 
-int find_desktop_in(char *current_desktop, const char *show_in_list);
+int check_desktop(char *current_desktop, const char *show_in_list);
+int check_tryexec(const char *cmd);
 void find_icon(char *icon_name, char *icon_path);
 void find_icon_dirs(char *data_dirs, Directories *dirs);
 void gen_entry(App *app, MenuEntry *entry);
@@ -130,9 +131,8 @@ int get_gtk_icon_theme_handler(void *user, const char *section, const char *name
 int if_show(void *user, const char *section, const char *name, const char *value);
 int match_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
-int try_exec(const char *cmd);
 
-int find_desktop_in(char *current_desktop, const char *show_in_list) {
+int check_desktop(char *current_desktop, const char *show_in_list) {
 	char *desktop;
 
 	desktop = strtok(current_desktop, ":");
@@ -140,6 +140,26 @@ int find_desktop_in(char *current_desktop, const char *show_in_list) {
 		if (strstr(show_in_list, desktop) != NULL)
 			return 1;
 		desktop = strtok(NULL, ":");
+	}
+	return 0;
+}
+
+int check_tryexec(const char *cmd)
+{
+	char file[MLEN], path_env[LLEN], *dir;
+	struct stat sb;
+
+	/* if command start with '/', check it directly */
+	if (cmd[0] == '/')
+		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
+
+	strncpy(path_env, PATH, LLEN);
+	dir = strtok(path_env, ":");
+	while (dir != NULL) {
+		sprintf(file, "%s/%s", dir, cmd);
+		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
+			return 1;
+		dir = strtok(NULL, ":");
 	}
 	return 0;
 }
@@ -298,11 +318,11 @@ int if_show(void *user, const char *section, const char *name, const char *value
 		&& ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
-			|| (strcmp(name, "TryExec") == 0 && try_exec(value) == 0)
+			|| (strcmp(name, "TryExec") == 0 && check_tryexec(value) == 0)
 			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
-				&& find_desktop_in(XDG_CURRENT_DESKTOP, value))
+				&& check_desktop(XDG_CURRENT_DESKTOP, value))
 			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
-				&& !find_desktop_in(XDG_CURRENT_DESKTOP, value))))
+				&& !check_desktop(XDG_CURRENT_DESKTOP, value))))
 		*flag = 0;
 	return 1;  /* success */
 }
@@ -429,26 +449,6 @@ void show_xdg_menu()
 		free(start);
 		start = tmp;
 	}
-}
-
-int try_exec(const char *cmd)
-{
-	char file[MLEN], path_temp[LLEN], *dir;
-	struct stat sb;
-
-	/* if command start with '/', check it directly */
-	if (cmd[0] == '/')
-		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
-
-	strncpy(path_temp, PATH, LLEN);
-	dir = strtok(path_temp, ":");
-	while (dir != NULL) {
-		sprintf(file, "%s/%s", dir, cmd);
-		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
-			return 1;
-		dir = strtok(NULL, ":");
-	}
-	return 0;
 }
 
 int main(int argc, char *argv[])
