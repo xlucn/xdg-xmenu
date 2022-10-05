@@ -120,25 +120,17 @@ char *exts[] = {"svg", "png", "xpm"};
 char fallback_icon_path[MLEN];
 Directories *all_dirs;
 
-int try_exec(const char *cmd)
-{
-	char file[MLEN], path_temp[LLEN], *dir;
-	struct stat sb;
-
-	/* if command start with '/', check it directly */
-	if (cmd[0] == '/')
-		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
-
-	strncpy(path_temp, PATH, LLEN);
-	dir = strtok(path_temp, ":");
-	while (dir != NULL) {
-		sprintf(file, "%s/%s", dir, cmd);
-		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
-			return 1;
-		dir = strtok(NULL, ":");
-	}
-	return 0;
-}
+int find_desktop_in(char *current_desktop, const char *show_in_list);
+void find_icon(char *icon_name, char *icon_path);
+void find_icon_dirs(char *data_dirs, Directories *dirs);
+void gen_entry(App *app, MenuEntry *entry);
+int get_app(void *user, const char *section, const char *name, const char *value);
+void get_gtk_icon_theme(char *buffer, const char *fallback);
+int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
+int if_show(void *user, const char *section, const char *name, const char *value);
+int match_icon_subdir(void *user, const char *section, const char *name, const char *value);
+void show_xdg_menu();
+int try_exec(const char *cmd);
 
 int find_desktop_in(char *current_desktop, const char *show_in_list) {
 	char *desktop;
@@ -150,45 +142,6 @@ int find_desktop_in(char *current_desktop, const char *show_in_list) {
 		desktop = strtok(NULL, ":");
 	}
 	return 0;
-}
-
-/* Handler for ini_parse, check if this application needs to show */
-int if_show(void *user, const char *section, const char *name, const char *value) {
-	int *flag = (int *)user;
-	if (strcmp(section, "Desktop Entry") == 0
-		&& ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
-			|| (strcmp(name, "TryExec") == 0 && try_exec(value) == 0)
-			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
-				&& find_desktop_in(XDG_CURRENT_DESKTOP, value))
-			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
-				&& !find_desktop_in(XDG_CURRENT_DESKTOP, value))))
-		*flag = 0;
-	return 1;  /* success */
-}
-
-/* Handler for ini_parse, parse app info and save in App variable pointed by *user */
-int get_app(void *user, const char *section, const char *name, const char *value) {
-	App *app = (App *)user;
-	if (strcmp(section, "Desktop Entry") == 0) {
-		if (strcmp(name, "Exec") == 0) {
-			strcpy(app->exec, value);
-		} else if (strcmp(name, "Icon") == 0) {
-			strcpy(app->icon, value);
-		} else if (strcmp(name, "Name") == 0) {
-			strcpy(app->name, value);
-		} else if (strcmp(name, "Terminal") == 0) {
-			app->terminal = strcmp(value, "true") == 0;
-		} else if (strcmp(name, "GenericName") == 0) {
-			strcpy(app->genericname, value);
-		} else if (strcmp(name, "Categories") == 0) {
-			strcpy(app->categories, value);
-		} else if (strcmp(name, "Path") == 0) {
-			strcpy(app->path, value);
-		}
-	}
-	return 1;
 }
 
 void find_icon(char *icon_name, char *icon_path)
@@ -289,13 +242,79 @@ void gen_entry(App *app, MenuEntry *entry)
 	sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
 }
 
+/* Handler for ini_parse, parse app info and save in App variable pointed by *user */
+int get_app(void *user, const char *section, const char *name, const char *value)
+{
+	App *app = (App *)user;
+	if (strcmp(section, "Desktop Entry") == 0) {
+		if (strcmp(name, "Exec") == 0) {
+			strcpy(app->exec, value);
+		} else if (strcmp(name, "Icon") == 0) {
+			strcpy(app->icon, value);
+		} else if (strcmp(name, "Name") == 0) {
+			strcpy(app->name, value);
+		} else if (strcmp(name, "Terminal") == 0) {
+			app->terminal = strcmp(value, "true") == 0;
+		} else if (strcmp(name, "GenericName") == 0) {
+			strcpy(app->genericname, value);
+		} else if (strcmp(name, "Categories") == 0) {
+			strcpy(app->categories, value);
+		} else if (strcmp(name, "Path") == 0) {
+			strcpy(app->path, value);
+		}
+	}
+	return 1;
+}
+
+void get_gtk_icon_theme(char *buffer, const char *fallback)
+{
+	int res;
+	char gtk3_settings[256] = {0}, *real_path;
+
+	sprintf(gtk3_settings, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
+	if (access(gtk3_settings, F_OK) == 0) {
+		real_path = realpath(gtk3_settings, NULL);
+		if ((res = ini_parse(real_path, get_gtk_icon_theme_handler, buffer)) < 0)
+			printf("failed parse gtk settings\n");
+		free(real_path);
+	}
+
+	if (strlen(buffer) == 0)
+		strcpy(buffer, fallback);
+}
+
+int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value)
+{
+	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
+		strcpy(user, value);
+	return 1;
+}
+
+/* Handler for ini_parse, check if this application needs to show */
+int if_show(void *user, const char *section, const char *name, const char *value)
+{
+	int *flag = (int *)user;
+	if (strcmp(section, "Desktop Entry") == 0
+		&& ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
+			|| (strcmp(name, "TryExec") == 0 && try_exec(value) == 0)
+			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
+				&& find_desktop_in(XDG_CURRENT_DESKTOP, value))
+			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
+				&& !find_desktop_in(XDG_CURRENT_DESKTOP, value))))
+		*flag = 0;
+	return 1;  /* success */
+}
+
 /*
  * handler for ini_parse
  * match subdirectories in an icon theme folder by parsing an index.theme file
  * - the icon size is options.icon_size
  * - the icon theme will be specified as the parsed the index.theme file
  */
-int match_icon_subdir(void *user, const char *section, const char *name, const char *value) {
+int match_icon_subdir(void *user, const char *section, const char *name, const char *value)
+{
 	/* static variables to preserve between function calls */
 	static char subdir[32], type[16];
 	static int size, minsize, maxsize, threshold, scale;
@@ -353,56 +372,8 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 	return 1;
 }
 
-int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value) {
-	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
-		strcpy(user, value);
-	return 1;
-}
-
-void get_gtk_icon_theme(char *buffer, const char *fallback) {
-	int res;
-	char gtk3_settings[256] = {0}, *real_path;
-
-	sprintf(gtk3_settings, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
-	if (access(gtk3_settings, F_OK) == 0) {
-		real_path = realpath(gtk3_settings, NULL);
-		if ((res = ini_parse(real_path, get_gtk_icon_theme_handler, buffer)) < 0)
-			printf("failed parse gtk settings\n");
-		free(real_path);
-	}
-
-	if (strlen(buffer) == 0)
-		strcpy(buffer, fallback);
-}
-
-int main(int argc, char *argv[])
+void show_xdg_menu()
 {
-	/* FIXME: fallback values */
-	PATH = getenv("PATH");
-	HOME = getenv("HOME");
-	XDG_DATA_HOME = getenv("XDG_DATA_HOME");
-	XDG_DATA_DIRS = getenv("XDG_DATA_DIRS");
-	XDG_CONFIG_HOME = getenv("XDG_CONFIG_HOME");
-	XDG_CURRENT_DESKTOP = getenv("XDG_CURRENT_DESKTOP");
-
-	int c;
-	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
-		switch (c) {
-			case 'b': option.fallback_icon = optarg; break;
-			case 'd': option.dump = 1; break;
-			case 'e': option.xdg_de = 1; break;
-			case 'G': option.no_genname = 1; break;
-			case 'i': option.icon_theme = optarg; break;
-			case 'I': option.no_icon = 1; break;
-			case 'n': option.dry_run = 1; break;
-			case 's': option.icon_size = atoi(optarg); break;
-			case 'S': option.scale = atoi(optarg); break;
-			case 't': option.terminal = optarg; break;
-			case 'x': option.xmenu_cmd = optarg; break;
-			case 'h': default: puts(usage_str); exit(0); break;
-		}
-	}
-
 	int if_show_flag, res;
 	App app;
 	MenuEntry menuentry;
@@ -458,6 +429,57 @@ int main(int argc, char *argv[])
 		free(start);
 		start = tmp;
 	}
+}
+
+int try_exec(const char *cmd)
+{
+	char file[MLEN], path_temp[LLEN], *dir;
+	struct stat sb;
+
+	/* if command start with '/', check it directly */
+	if (cmd[0] == '/')
+		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
+
+	strncpy(path_temp, PATH, LLEN);
+	dir = strtok(path_temp, ":");
+	while (dir != NULL) {
+		sprintf(file, "%s/%s", dir, cmd);
+		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
+			return 1;
+		dir = strtok(NULL, ":");
+	}
+	return 0;
+}
+
+int main(int argc, char *argv[])
+{
+	/* FIXME: fallback values */
+	PATH = getenv("PATH");
+	HOME = getenv("HOME");
+	XDG_DATA_HOME = getenv("XDG_DATA_HOME");
+	XDG_DATA_DIRS = getenv("XDG_DATA_DIRS");
+	XDG_CONFIG_HOME = getenv("XDG_CONFIG_HOME");
+	XDG_CURRENT_DESKTOP = getenv("XDG_CURRENT_DESKTOP");
+
+	int c;
+	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
+		switch (c) {
+			case 'b': option.fallback_icon = optarg; break;
+			case 'd': option.dump = 1; break;
+			case 'e': option.xdg_de = 1; break;
+			case 'G': option.no_genname = 1; break;
+			case 'i': option.icon_theme = optarg; break;
+			case 'I': option.no_icon = 1; break;
+			case 'n': option.dry_run = 1; break;
+			case 's': option.icon_size = atoi(optarg); break;
+			case 'S': option.scale = atoi(optarg); break;
+			case 't': option.terminal = optarg; break;
+			case 'x': option.xmenu_cmd = optarg; break;
+			case 'h': default: puts(usage_str); exit(0); break;
+		}
+	}
+
+	show_xdg_menu();
 
 	return 0;
 }
