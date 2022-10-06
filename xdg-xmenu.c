@@ -109,16 +109,16 @@ struct Name2Icon {
 };
 
 const char *usage_str =
-	"xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-t TERMINAL] [-x CMD]\n\n"
+	"xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD]\n\n"
 	"Generate XDG menu for xmenu.\n\n"
 	"Options:\n"
-	"  -h          show this help message and exit\n"
-	"  -b ICON     Fallback icon for apps without icons, default is application-x-executable\n"
+	"  -h          Show this help message and exit\n"
+	"  -b ICON     Fallback icon name, default is application-x-executable\n"
 	"  -d          Dump generated menu, do not run xmenu\n"
 	"  -e          Show apps according to desktop environments\n"
 	"  -G          Do not show generic name of the app\n"
-	"  -i THEME    Icon theme for app icons. Default to gtk3 settings.\n"
-	"  -I          Disable icon in xmenu.\n"
+	"  -i THEME    Icon theme for app icons. Default to gtk3 settings\n"
+	"  -I          Disable icon in xmenu\n"
 	"  -n          Do not run app, output to stdout\n"
 	"  -s SIZE     Icon theme for app icons\n"
 	"  -S SCALE    Icon size scale factor, work with HiDPI screens\n"

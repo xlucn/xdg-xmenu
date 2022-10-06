@@ -9,20 +9,21 @@ For the legacy shell and python versions, see corresponding branches of this git
 ## Usage
 
 ```
-xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-t TERMINAL] [-x CMD]
+xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD]
 
 Generate XDG menu for xmenu.
 
 Options:
-  -h          show this help message and exit
-  -b ICON     Fallback icon for apps without icons, default is application-x-executable
+  -h          Show this help message and exit
+  -b ICON     Fallback icon name, default is application-x-executable
   -d          Dump generated menu, do not run xmenu
   -e          Show apps according to desktop environments
   -G          Do not show generic name of the app
-  -i THEME    Icon theme for app icons. Default to gtk3 settings.
-  -I          Disable icon in xmenu.
+  -i THEME    Icon theme for app icons. Default to gtk3 settings
+  -I          Disable icon in xmenu
   -n          Do not run app, output to stdout
   -s SIZE     Icon theme for app icons
+  -S SCALE    Icon size scale factor, work with HiDPI screens
   -t TERMINAL Terminal emulator to use, default is xterm
   -x CMD      Xmenu command to use, default is xmenu
 ```
