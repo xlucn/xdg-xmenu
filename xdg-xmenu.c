@@ -223,42 +223,33 @@ void find_icon_dirs(char *data_dirs, Directories *dirs)
 
 void gen_entry(App *app, MenuEntry *entry)
 {
-	int totlen, replen, prelen;
-	char *perc, *replace_str, *prefix_str;
-	char icon_path[MLEN], name[MLEN], command[MLEN + 32];
+	char *perc, replace_str[MLEN];
+	char icon_path[MLEN], name[MLEN + 4], command[MLEN + SLEN], buffer[MLEN];
 
 	if (app->terminal)
-		sprintf(command, "%s -e %s", "xterm", app->exec);
+		sprintf(command, "%s -e %s", option.terminal, app->exec);
 	else
 		strcpy(command, app->exec);
 
 	/* replace field codes */
 	/* search starting from right, this way the starting position stays the same */
 	while ((perc = strrchr(command, '%')) != NULL) {
+		memset(replace_str, 0, MLEN);
 		if (isalpha(*(perc + 1))) {
-			replace_str = "";
-			prefix_str = "";
 			switch (*(perc + 1)) {
 				case 'c':
-					replace_str = app->entry_path;
+					strncpy(replace_str, app->entry_path, MLEN);
 					break;
 				case 'k':
-					replace_str = app->name;
+					strncpy(replace_str, app->name, MLEN);
 					break;
 				case 'i':
-					if (strlen(app->icon) != 0) {
-						replace_str = app->icon;
-						prefix_str = "--icon ";
-					}
+					if (strlen(app->icon) != 0)
+						snprintf(replace_str, MLEN, "--icon %s", app->icon);
 					break;
 			}
-			prelen = strlen(prefix_str);
-			replen = strlen(replace_str);
-			totlen = prelen + replen;
-			/* use memmove to deal with overlapping cases */
-			memmove(perc + totlen, perc + 2, command + MLEN - perc - totlen);
-			memmove(perc, prefix_str, prelen);
-			memmove(perc + prelen, replace_str, replen);
+			strncpy(buffer, perc + 2, MLEN);
+			snprintf(perc, MLEN - (perc - command), "%s%s", replace_str, buffer);
 		}
 	}
 
