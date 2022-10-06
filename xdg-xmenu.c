@@ -520,27 +520,31 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	/* FIXME: check return */
-	char *xmenu_argv[] = {NULL}, line[1024] = {0};
-	FILE *fwrite, *fread;
-	/* TODO: maybe use -- to split xdg-xmenu and xmenu args? */
-	spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
+	if (option.dump) {
+		show_xdg_menu(NULL);
+	} else {
+		/* FIXME: check return */
+		char *xmenu_argv[] = {NULL}, line[1024] = {0};
+		FILE *fwrite, *fread;
+		/* TODO: maybe use -- to split xdg-xmenu and xmenu args? */
+		spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
 
-	fwrite = fdopen(s.writefd, "w");
-	show_xdg_menu(fwrite);
-	fclose(fwrite);
+		fwrite = fdopen(s.writefd, "w");
+		show_xdg_menu(fwrite);
+		fclose(fwrite);
 
-	waitpid(s.pid, NULL, 0);
-	fread = fdopen(s.readfd, "r");
-	if (fgets(line, 1024, fread)) {
-		if (option.dry_run)
-			printf("%s", line);
-		else
-			system(line);
+		waitpid(s.pid, NULL, 0);
+		fread = fdopen(s.readfd, "r");
+		if (fgets(line, 1024, fread)) {
+			if (option.dry_run)
+				printf("%s", line);
+			else
+				system(line);
+		}
+
+		close(s.writefd);
+		close(s.readfd);
 	}
-
-	close(s.writefd);
-	close(s.readfd);
 
 	return 0;
 }
