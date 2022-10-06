@@ -1,14 +1,20 @@
-PROG=xdg-xmenu
+SRC=xdg-xmenu.c
+BIN=xdg-xmenu
 
-PREFIX = /usr/local
+PREFIX=/usr/local
 
-PROG:
-	${CC} -Wall -linih xdg-xmenu.c -o ${PROG}
+all: ${BIN}
+
+${BIN}: ${SRC}
+	${CC} -Wall -linih ${SRC} -o ${BIN} -g
 
 install:
-	install -D -m 755 ${PROG} ${DESTDIR}${PREFIX}/bin/${PROG}
+	install -D -m 755 ${BIN} ${DESTDIR}${PREFIX}/bin/${PROG}
 
 uninstall:
-	rm -f ${DESTDIR}${PREFIX}/bin/${PROG}
+	rm -f ${DESTDIR}${PREFIX}/bin/${BIN}
 
-.PHONY: install uninstall
+clean:
+	rm -f ${BIN}
+
+.PHONY: install uninstall clean
