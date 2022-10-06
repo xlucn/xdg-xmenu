@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include <ini.h>
@@ -59,6 +60,12 @@ typedef struct Directories {
 	char dir[MLEN];
 	struct Directories *next;
 } Directories;
+
+typedef struct spawn_t {
+	int readfd;
+	int writefd;
+	pid_t pid;
+} spawn_t;
 
 struct Category2Name {
 	char *catetory;
@@ -131,6 +138,7 @@ int get_gtk_icon_theme_handler(void *user, const char *section, const char *name
 int if_show(void *user, const char *section, const char *name, const char *value);
 int match_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
+spawn_t spawn(const char *cmd, char *const argv[]);
 
 int check_desktop(char *current_desktop, const char *show_in_list) {
 	char *desktop;
@@ -392,7 +400,7 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 	return 1;
 }
 
-void show_xdg_menu()
+void show_xdg_menu(FILE *fp)
 {
 	int if_show_flag, res;
 	App app;
@@ -438,7 +446,10 @@ void show_xdg_menu()
 			fprintf(stderr, "Desktop file parse failed: %d\n", res);
 
 		gen_entry(&app, &menuentry);
-		puts(menuentry.text);
+		if (option.dump)
+			printf("%s\n", menuentry.text);
+		else
+			fprintf(fp, "%s\n", menuentry.text);
 	}
 
 	if (dir)
@@ -449,6 +460,38 @@ void show_xdg_menu()
 		free(start);
 		start = tmp;
 	}
+}
+
+/*
+ * User input 1--------->0 cmd 1-------->0 Output
+ *             pfd_write        pdf_read
+ * Create 2 pipes connecting cmd process with pfd_read[1] and pfd_write[0], and
+ * return pfd_read[0] and pfd_write[1] back to user for read and write.
+ */
+spawn_t spawn(const char *cmd, char *const argv[])
+{
+	pid_t pid;
+	spawn_t status = { -1, -1, -1 };
+	int pfd_read[2] = { -1, -1 }, pfd_write[2] = { -1, -1 };
+
+	pipe(pfd_read);
+	pipe(pfd_write);
+
+	if ((pid = fork()) == 0) { /* in child */
+		dup2(pfd_read[1], 1);
+		dup2(pfd_write[0], 0);
+		close(pfd_read[0]);
+		close(pfd_write[1]);
+		execvp(cmd, argv);
+	} else if (pid > 0) { /* in parent */
+		status.pid = pid;
+		status.readfd = pfd_read[0];
+		status.writefd = pfd_write[1];
+	}
+
+	close(pfd_read[1]);
+	close(pfd_write[0]);
+	return status;
 }
 
 int main(int argc, char *argv[])
@@ -479,7 +522,22 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	show_xdg_menu();
+	/* FIXME: check return */
+	char *command[] = {"xmenu", 0}, line[1024] = {0};
+	FILE *fwrite, *fread;
+	spawn_t s = spawn("xmenu", command);
+
+	fwrite = fdopen(s.writefd, "w");
+	show_xdg_menu(fwrite);
+	fclose(fwrite);
+
+	waitpid(s.pid, NULL, 0);
+	fread = fdopen(s.readfd, "r");
+	if (fgets(line, 1024, fread))
+		system(line);
+
+	close(s.writefd);
+	close(s.readfd);
 
 	return 0;
 }
