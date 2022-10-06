@@ -521,9 +521,10 @@ int main(int argc, char *argv[])
 	}
 
 	/* FIXME: check return */
-	char *command[] = {"xmenu", 0}, line[1024] = {0};
+	char *xmenu_argv[] = {NULL}, line[1024] = {0};
 	FILE *fwrite, *fread;
-	spawn_t s = spawn("xmenu", command);
+	/* TODO: maybe use -- to split xdg-xmenu and xmenu args? */
+	spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
 
 	fwrite = fdopen(s.writefd, "w");
 	show_xdg_menu(fwrite);
