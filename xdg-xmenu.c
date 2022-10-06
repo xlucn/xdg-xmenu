@@ -15,9 +15,12 @@
 
 #include <ini.h>
 
+/* for long texts */
 #define LLEN 1024
+/* for file paths */
 #define MLEN 256
-#define SLEN 64
+/* for simple names or directories */
+#define SLEN 128
 
 struct Option {
 	char *fallback_icon;
@@ -46,7 +49,7 @@ typedef struct App {
 	char icon[SLEN];
 	char name[SLEN];
 	char genericname[SLEN];
-	char categories[MLEN];
+	char categories[LLEN];
 	char path[MLEN];
 } App;
 
@@ -57,7 +60,7 @@ typedef struct MenuEntry {
 } MenuEntry;
 
 typedef struct Directories {
-	char dir[MLEN];
+	char dir[SLEN];
 	struct Directories *next;
 } Directories;
 
@@ -174,12 +177,12 @@ int check_tryexec(const char *cmd)
 
 void find_icon(char *icon_name, char *icon_path)
 {
-	char test_path[MLEN * 2];
+	char test_path[MLEN];
 	Directories *d = all_dirs;
 
 	while (d && d->next) {
 		for (int i = 0; i < sizeof(exts) / sizeof(exts[0]); i++) {
-			snprintf(test_path, MLEN * 2, "%s/%s.%s", d->dir, icon_name, exts[i]);
+			snprintf(test_path, MLEN, "%s/%s.%s", d->dir, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
 				strncpy(icon_path, test_path, MLEN);
 				return;
@@ -193,13 +196,13 @@ void find_icon(char *icon_name, char *icon_path)
 void find_icon_dirs(char *data_dirs, Directories *dirs)
 {
 	int res, len_parent;
-	char *dir, dir_parent[256] = {0}, index_theme[256] = {0}, buffer[1024] = {0};
+	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0}, buffer[LLEN] = {0};
 
-	strncpy(buffer, data_dirs, 1024);
+	strncpy(buffer, data_dirs, LLEN);
 	dir = strtok(buffer, ":");
 	while(dir != NULL) {
 		/* dir is now a data directory */
-		snprintf(index_theme, 256, "%s/icons/%s/index.theme", dir, option.icon_theme);
+		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
 			if ((res = ini_parse(index_theme, match_icon_subdir, dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
@@ -208,7 +211,7 @@ void find_icon_dirs(char *data_dirs, Directories *dirs)
 		}
 
 		/* prepend dirs with parent path */
-		len_parent = snprintf(dir_parent, 256, "%s/icons/%s/", dir, option.icon_theme);
+		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir, option.icon_theme);
 		while (dirs->next) {
 			if (dirs->dir[0] != '/') {
 				strncpy(dirs->dir + len_parent, dirs->dir, strlen(dirs->dir));
@@ -258,6 +261,7 @@ void gen_entry(App *app, MenuEntry *entry)
 		sprintf(name, "%s (%s)", app->name, app->genericname);
 	else
 		strcpy(name, app->name);
+
 	sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
 }
 
@@ -353,7 +357,7 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 					&& minsize <= option.icon_size
 					&& maxsize >= option.icon_size)) {
 				/* save dirs into this linked list */
-				strncpy(dirs->dir, subdir, MLEN);
+				strncpy(dirs->dir, subdir, SLEN);
 				dirs->next = calloc(sizeof(Directories), 1);
 				dirs = dirs->next;
 				dirs->next = NULL;
