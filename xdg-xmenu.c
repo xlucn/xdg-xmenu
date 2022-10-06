@@ -262,7 +262,10 @@ void gen_entry(App *app, MenuEntry *entry)
 	else
 		strcpy(name, app->name);
 
-	sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
+	if (option.no_icon)
+		sprintf(entry->text, "\t%s\t%s", name, command);
+	else
+		sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
 }
 
 /* Handler for ini_parse, parse app info and save in App variable pointed by *user */
@@ -528,8 +531,12 @@ int main(int argc, char *argv[])
 
 	waitpid(s.pid, NULL, 0);
 	fread = fdopen(s.readfd, "r");
-	if (fgets(line, 1024, fread))
-		system(line);
+	if (fgets(line, 1024, fread)) {
+		if (option.dry_run)
+			printf("%s", line);
+		else
+			system(line);
+	}
 
 	close(s.writefd);
 	close(s.readfd);
