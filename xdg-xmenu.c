@@ -21,6 +21,8 @@
 #define MLEN 256
 /* for simple names or directories */
 #define SLEN 128
+/* for part in string.split(delimiter) */
+#define FOR_SPLIT(P, S, D) for (P = strtok(S, D); P; P = strtok(NULL, D))
 
 struct Option {
 	char *fallback_icon;
@@ -43,26 +45,26 @@ struct Option {
 };
 
 typedef struct App {
-	int terminal;
+	char categories[LLEN];
 	char entry_path[MLEN];
 	char exec[MLEN];
+	char genericname[SLEN];
 	char icon[SLEN];
 	char name[SLEN];
-	char genericname[SLEN];
-	char categories[LLEN];
 	char path[MLEN];
+	int terminal;
 } App;
 
 typedef struct MenuEntry {
 	char category[SLEN];
 	char text[LLEN];
-	void *next;
+	struct MenuEntry *next;
 } MenuEntry;
 
-typedef struct Directories {
+typedef struct Dir {
 	char dir[SLEN];
-	struct Directories *next;
-} Directories;
+	struct Dir *next;
+} Dir;
 
 typedef struct spawn_t {
 	int readfd;
@@ -127,35 +129,31 @@ const char *usage_str =
 
 char *PATH, *HOME, *XDG_DATA_HOME, *XDG_DATA_DIRS, *XDG_CONFIG_HOME, *XDG_CURRENT_DESKTOP;
 char *exts[] = {"svg", "png", "xpm"};
-char fallback_icon_path[MLEN];
-Directories *all_dirs;
+char FALLBACK_ICON_PATH[MLEN];
+Dir *all_dirs;
 
 int check_desktop(char *current_desktop, const char *show_in_list);
-int check_tryexec(const char *cmd);
-void find_icon(char *icon_name, char *icon_path);
-void find_icon_dirs(char *data_dirs, Directories *dirs);
+int check_exec(const char *cmd);
+int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
+void find_icon(char *icon_path, char *icon_name);
+void find_icon_dirs(char *data_dirs, Dir *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void get_gtk_icon_theme(char *buffer, const char *fallback);
 int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 int if_show(void *user, const char *section, const char *name, const char *value);
-int match_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
 
-int check_desktop(char *current_desktop, const char *show_in_list) {
+int check_desktop(char *current_desktop, const char *desktop_list) {
 	char *desktop;
-
-	desktop = strtok(current_desktop, ":");
-	while (desktop != NULL) {
-		if (strstr(show_in_list, desktop) != NULL)
+	FOR_SPLIT (desktop, current_desktop, ":")
+		if (strstr(desktop_list, desktop))
 			return 1;
-		desktop = strtok(NULL, ":");
-	}
 	return 0;
 }
 
-int check_tryexec(const char *cmd)
+int check_exec(const char *cmd)
 {
 	char file[MLEN], path_env[LLEN], *dir;
 	struct stat sb;
@@ -165,22 +163,19 @@ int check_tryexec(const char *cmd)
 		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
 
 	strncpy(path_env, PATH, LLEN);
-	dir = strtok(path_env, ":");
-	while (dir != NULL) {
+	FOR_SPLIT (dir, path_env, ":") {
 		sprintf(file, "%s/%s", dir, cmd);
 		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
 			return 1;
-		dir = strtok(NULL, ":");
 	}
 	return 0;
 }
 
-void find_icon(char *icon_name, char *icon_path)
+void find_icon(char *icon_path, char *icon_name)
 {
 	char test_path[MLEN];
-	Directories *d = all_dirs;
 
-	while (d && d->next) {
+	for (Dir *d = all_dirs; d && d->next; d = d->next) {
 		for (int i = 0; i < sizeof(exts) / sizeof(exts[0]); i++) {
 			snprintf(test_path, MLEN, "%s/%s.%s", d->dir, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
@@ -188,45 +183,43 @@ void find_icon(char *icon_name, char *icon_path)
 				return;
 			}
 		}
-		d = d->next;
 	}
-	strncpy(icon_path, fallback_icon_path, MLEN);
+	strncpy(icon_path, FALLBACK_ICON_PATH, MLEN);
 }
 
-void find_icon_dirs(char *data_dirs, Directories *dirs)
+void find_icon_dirs(char *data_dirs, Dir *dirs)
 {
 	int res, len_parent;
-	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0}, buffer[LLEN] = {0};
+	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0}, data_dirs_copy[LLEN] = {0};
 
-	strncpy(buffer, data_dirs, LLEN);
-	dir = strtok(buffer, ":");
-	while(dir != NULL) {
+	/* strtok (see FOR_SPLIT) changes the string, so use a copy */
+	strncpy(data_dirs_copy, data_dirs, LLEN);
+	FOR_SPLIT (dir, data_dirs_copy, ":") {
 		/* dir is now a data directory */
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
-			if ((res = ini_parse(index_theme, match_icon_subdir, dirs)) < 0)
+			if ((res = ini_parse(index_theme, collect_icon_subdir, dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 			/* mannually call. a hack to process the end of file */
-			match_icon_subdir(dirs, "", NULL, NULL);
+			collect_icon_subdir(dirs, "", NULL, NULL);
 		}
 
 		/* prepend dirs with parent path */
 		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir, option.icon_theme);
 		while (dirs->next) {
+			/* FIXME: This is hacky, change this */
 			if (dirs->dir[0] != '/') {
 				strncpy(dirs->dir + len_parent, dirs->dir, strlen(dirs->dir));
 				memcpy(dirs->dir, dir_parent, strlen(dir_parent));
 			}
 			dirs = dirs->next;
 		}
-
-		dir = strtok(NULL, ":");
 	}
 }
 
 void gen_entry(App *app, MenuEntry *entry)
 {
-	char *perc, replace_str[MLEN];
+	char *perc, field, replace_str[MLEN];
 	char icon_path[MLEN], name[MLEN + 4], command[MLEN + SLEN], buffer[MLEN];
 
 	if (app->terminal)
@@ -237,26 +230,21 @@ void gen_entry(App *app, MenuEntry *entry)
 	/* replace field codes */
 	/* search starting from right, this way the starting position stays the same */
 	while ((perc = strrchr(command, '%')) != NULL) {
-		memset(replace_str, 0, MLEN);
-		if (isalpha(*(perc + 1))) {
-			switch (*(perc + 1)) {
-				case 'c':
-					strncpy(replace_str, app->entry_path, MLEN);
-					break;
-				case 'k':
-					strncpy(replace_str, app->name, MLEN);
-					break;
-				case 'i':
-					if (strlen(app->icon) != 0)
-						snprintf(replace_str, MLEN, "--icon %s", app->icon);
-					break;
-			}
+		field = *(perc + 1);
+		if (isalpha(field)) {
+			memset(replace_str, 0, MLEN);
+			if (field == 'c')
+				strncpy(replace_str, app->entry_path, MLEN);
+			else if (field == 'i' && strlen(app->icon) != 0)
+				snprintf(replace_str, MLEN, "--icon %s", app->icon);
+			else if (field == 'k')
+				strncpy(replace_str, app->name, MLEN);
 			strncpy(buffer, perc + 2, MLEN);
 			snprintf(perc, MLEN - (perc - command), "%s%s", replace_str, buffer);
 		}
 	}
 
-	find_icon(app->icon, icon_path);
+	find_icon(icon_path, app->icon);
 	if (!option.no_genname && strlen(app->genericname) > 0)
 		sprintf(name, "%s (%s)", app->name, app->genericname);
 	else
@@ -273,21 +261,20 @@ int get_app(void *user, const char *section, const char *name, const char *value
 {
 	App *app = (App *)user;
 	if (strcmp(section, "Desktop Entry") == 0) {
-		if (strcmp(name, "Exec") == 0) {
+		if (strcmp(name, "Exec") == 0)
 			strcpy(app->exec, value);
-		} else if (strcmp(name, "Icon") == 0) {
+		else if (strcmp(name, "Icon") == 0)
 			strcpy(app->icon, value);
-		} else if (strcmp(name, "Name") == 0) {
+		else if (strcmp(name, "Name") == 0)
 			strcpy(app->name, value);
-		} else if (strcmp(name, "Terminal") == 0) {
+		else if (strcmp(name, "Terminal") == 0)
 			app->terminal = strcmp(value, "true") == 0;
-		} else if (strcmp(name, "GenericName") == 0) {
+		else if (strcmp(name, "GenericName") == 0)
 			strcpy(app->genericname, value);
-		} else if (strcmp(name, "Categories") == 0) {
+		else if (strcmp(name, "Categories") == 0)
 			strcpy(app->categories, value);
-		} else if (strcmp(name, "Path") == 0) {
+		else if (strcmp(name, "Path") == 0)
 			strcpy(app->path, value);
-		}
 	}
 	return 1;
 }
@@ -316,7 +303,9 @@ int get_gtk_icon_theme_handler(void *user, const char *section, const char *name
 	return 1;
 }
 
-/* Handler for ini_parse, check if this application needs to show */
+/* Handler for ini_parse, check if this application needs to show
+ * Set *user to 0 (False) if some criterions are met
+ **/
 int if_show(void *user, const char *section, const char *name, const char *value)
 {
 	int *flag = (int *)user;
@@ -324,7 +313,7 @@ int if_show(void *user, const char *section, const char *name, const char *value
 		&& ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
-			|| (strcmp(name, "TryExec") == 0 && check_tryexec(value) == 0)
+			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
 			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
 				&& check_desktop(XDG_CURRENT_DESKTOP, value))
 			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
@@ -339,20 +328,20 @@ int if_show(void *user, const char *section, const char *name, const char *value
  * - the icon size is options.icon_size
  * - the icon theme will be specified as the parsed the index.theme file
  */
-int match_icon_subdir(void *user, const char *section, const char *name, const char *value)
+int collect_icon_subdir(void *user, const char *section, const char *name, const char *value)
 {
 	/* static variables to preserve between function calls */
 	static char subdir[32], type[16];
 	static int size, minsize, maxsize, threshold, scale;
 
-	Directories *dirs = (Directories *)user;
+	Dir *dirs = (Dir *)user;
 	while (dirs->next != NULL)
 		dirs = dirs->next;
 
 	if (strcmp(section, subdir) != 0 || (!name && !value)) {
 		/* Check the icon size after finished parsing a section */
 		if (scale == option.scale)
-			if (((strlen(type) == 0 || strcmp(type, "Threshold") == 0)
+			if (((strcmp(type, "Threshold") == 0 || strlen(type) == 0)
 					&& abs(size - option.icon_size) <= threshold)
 				|| (strcmp(type, "Fixed") == 0
 					&& size == option.icon_size)
@@ -361,7 +350,7 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 					&& maxsize >= option.icon_size)) {
 				/* save dirs into this linked list */
 				strncpy(dirs->dir, subdir, SLEN);
-				dirs->next = calloc(sizeof(Directories), 1);
+				dirs->next = calloc(sizeof(Dir), 1);
 				dirs = dirs->next;
 				dirs->next = NULL;
 			}
@@ -398,7 +387,7 @@ int match_icon_subdir(void *user, const char *section, const char *name, const c
 	return 1;
 }
 
-void show_xdg_menu(FILE *fp)
+void show_xdg_menu(FILE *xmenu_input)
 {
 	int if_show_flag, res;
 	App app;
@@ -411,17 +400,17 @@ void show_xdg_menu(FILE *fp)
 	if (!option.icon_theme || strlen(option.icon_theme) == 0)
 		option.icon_theme = icon_theme;
 
-	all_dirs = calloc(sizeof(Directories), 1);
+	all_dirs = calloc(sizeof(Dir), 1);
 	find_icon_dirs(XDG_DATA_DIRS, all_dirs);
 	find_icon_dirs(XDG_DATA_HOME, all_dirs);
 
-	Directories *start = all_dirs, *tmp;
+	Dir *start = all_dirs, *tmp;
 	for (start = all_dirs; start->next; start = start->next) ;
-	start->next = calloc(sizeof(Directories), 1);
+	start->next = calloc(sizeof(Dir), 1);
 	start = start->next;
 	strcpy(start->dir, "/usr/share/pixmaps");
 
-	find_icon(option.fallback_icon, fallback_icon_path);
+	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
 	/* output all app in folder */
 	if ((dir = opendir(folder)) == NULL) {
@@ -447,7 +436,7 @@ void show_xdg_menu(FILE *fp)
 		if (option.dump)
 			printf("%s\n", menuentry.text);
 		else
-			fprintf(fp, "%s\n", menuentry.text);
+			fprintf(xmenu_input, "%s\n", menuentry.text);
 	}
 
 	if (dir)
