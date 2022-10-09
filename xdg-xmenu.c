@@ -130,6 +130,7 @@ const char *usage_str =
 char *PATH, *HOME, *XDG_DATA_HOME, *XDG_DATA_DIRS, *XDG_CONFIG_HOME, *XDG_CURRENT_DESKTOP;
 char *exts[] = {"svg", "png", "xpm"};
 char FALLBACK_ICON_PATH[MLEN];
+char *FALLBACK_ICON_THEME = "hicolor";
 Dir *all_dirs;
 
 int check_desktop(char *current_desktop, const char *show_in_list);
@@ -139,9 +140,9 @@ void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs(char *data_dirs, Dir *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
-void get_gtk_icon_theme(char *buffer, const char *fallback);
-int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 int if_show(void *user, const char *section, const char *name, const char *value);
+int set_icon_theme();
+int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
 
@@ -279,24 +280,31 @@ int get_app(void *user, const char *section, const char *name, const char *value
 	return 1;
 }
 
-void get_gtk_icon_theme(char *buffer, const char *fallback)
+int set_icon_theme()
 {
 	int res;
-	char gtk3_settings[256] = {0}, *real_path;
+	char gtk3_settings[MLEN] = {0}, *real_path, *buffer;
 
-	sprintf(gtk3_settings, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
+	if (option.icon_theme && strlen(option.icon_theme) > 0)
+		return 0;
+
+	buffer = malloc(SLEN);
+	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
-		if ((res = ini_parse(real_path, get_gtk_icon_theme_handler, buffer)) < 0)
-			printf("failed parse gtk settings\n");
+		if ((res = ini_parse(real_path, set_icon_theme_handler, buffer)) < 0)
+			fprintf(stderr, "failed parse gtk settings\n");
 		free(real_path);
 	}
 
 	if (strlen(buffer) == 0)
-		strcpy(buffer, fallback);
+		option.icon_theme = FALLBACK_ICON_THEME;
+	else
+		option.icon_theme = buffer;
+	return 1;
 }
 
-int get_gtk_icon_theme_handler(void *user, const char *section, const char *name, const char *value)
+int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value)
 {
 	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
 		strcpy(user, value);
@@ -389,16 +397,14 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 
 void show_xdg_menu(FILE *xmenu_input)
 {
-	int if_show_flag, res;
+	int if_show_flag, res, icon_theme_need_free;
 	App app;
 	MenuEntry menuentry;
-	char *folder = "/usr/share/applications", path[LLEN], icon_theme[64] = {0};
+	char *folder = "/usr/share/applications", path[LLEN];
 	DIR *dir;
 	struct dirent *entry;
 
-	get_gtk_icon_theme(icon_theme, "hicolor");
-	if (!option.icon_theme || strlen(option.icon_theme) == 0)
-		option.icon_theme = icon_theme;
+	icon_theme_need_free = set_icon_theme();
 
 	all_dirs = calloc(sizeof(Dir), 1);
 	find_icon_dirs(XDG_DATA_DIRS, all_dirs);
@@ -442,6 +448,8 @@ void show_xdg_menu(FILE *xmenu_input)
 	if (dir)
 		closedir(dir);
 
+	if (icon_theme_need_free)
+		free(option.icon_theme);
 	while (start->next) {
 		tmp = start->next;
 		free(start);
