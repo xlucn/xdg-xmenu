@@ -127,7 +127,12 @@ const char *usage_str =
 	"  -t TERMINAL Terminal emulator to use, default is xterm\n"
 	"  -x CMD      Xmenu command to use, default is xmenu\n";
 
-char *PATH, *HOME, *XDG_DATA_HOME, *XDG_DATA_DIRS, *XDG_CONFIG_HOME, *XDG_CURRENT_DESKTOP;
+char PATH[LLEN];
+char HOME[SLEN];
+char XDG_DATA_HOME[SLEN];
+char XDG_DATA_DIRS[LLEN];
+char XDG_CONFIG_HOME[SLEN];
+char XDG_CURRENT_DESKTOP[SLEN];
 char *exts[] = {"svg", "png", "xpm"};
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
@@ -140,6 +145,7 @@ void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs(char *data_dirs, Dir *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
+void getenv_fb(char *dest, char *name, char *fallback, int n);
 int if_show(void *user, const char *section, const char *name, const char *value);
 int set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
@@ -278,6 +284,23 @@ int get_app(void *user, const char *section, const char *name, const char *value
 			strcpy(app->path, value);
 	}
 	return 1;
+}
+
+/* getenv with fallback value */
+void getenv_fb(char *dest, char *name, char *fallback, int n)
+{
+	char *tmp;
+
+	tmp = getenv(name);
+	if (tmp == NULL || strlen(tmp) == 0)
+		if (fallback == NULL)
+			return;
+		else if (strstr(fallback, "~/") == fallback)
+			snprintf(dest, n, "%s/%s", HOME, fallback + 2);
+		else
+			strncpy(dest, fallback, n);
+	else
+		strncpy(dest, tmp, n);
 }
 
 int set_icon_theme()
@@ -491,13 +514,12 @@ spawn_t spawn(const char *cmd, char *const argv[])
 
 int main(int argc, char *argv[])
 {
-	/* FIXME: fallback values */
-	PATH = getenv("PATH");
-	HOME = getenv("HOME");
-	XDG_DATA_HOME = getenv("XDG_DATA_HOME");
-	XDG_DATA_DIRS = getenv("XDG_DATA_DIRS");
-	XDG_CONFIG_HOME = getenv("XDG_CONFIG_HOME");
-	XDG_CURRENT_DESKTOP = getenv("XDG_CURRENT_DESKTOP");
+	getenv_fb(PATH, "PATH", NULL, LLEN);
+	getenv_fb(HOME, "HOME", NULL, SLEN);
+	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", "~/.local/share", SLEN);
+	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
+	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", "~/.config", SLEN);
+	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
 
 	int c;
 	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
