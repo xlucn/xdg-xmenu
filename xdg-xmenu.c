@@ -487,7 +487,10 @@ spawn_t spawn(const char *cmd, char *const argv[])
 		dup2(pfd_write[0], 0);
 		close(pfd_read[0]);
 		close(pfd_write[1]);
-		execvp(cmd, argv);
+		if(execvp(cmd, argv) == -1) {
+			fprintf(stderr, "execute %s failed\n", cmd);
+			exit(1);
+		}
 	} else if (pid > 0) { /* in parent */
 		status.pid = pid;
 		status.readfd = pfd_read[0];
