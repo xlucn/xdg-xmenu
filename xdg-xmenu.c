@@ -134,6 +134,7 @@ char XDG_DATA_HOME[SLEN];
 char XDG_DATA_DIRS[LLEN];
 char XDG_CONFIG_HOME[SLEN];
 char XDG_CURRENT_DESKTOP[SLEN];
+char DATA_DIRS[LLEN + MLEN];
 char *exts[] = {"svg", "png", "xpm"};
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
@@ -143,7 +144,7 @@ int check_desktop(char *current_desktop, const char *show_in_list);
 int check_exec(const char *cmd);
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
-void find_icon_dirs(char *data_dirs, Dir *dirs);
+void find_icon_dirs(Dir *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
@@ -193,12 +194,12 @@ void find_icon(char *icon_path, char *icon_name)
 	strncpy(icon_path, FALLBACK_ICON_PATH, MLEN);
 }
 
-void find_icon_dirs(char *data_dirs, Dir *dirs)
+void find_icon_dirs(Dir *dirs)
 {
 	int res, len_parent;
 	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
 
-	FOR_SPLIT (dir, data_dirs, ":") {
+	FOR_SPLIT (dir, DATA_DIRS, ":") {
 		/* dir is now a data directory */
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
@@ -418,8 +419,7 @@ void show_xdg_menu(FILE *xmenu_input)
 	icon_theme_need_free = set_icon_theme();
 
 	all_dirs = calloc(sizeof(Dir), 1);
-	find_icon_dirs(XDG_DATA_DIRS, all_dirs);
-	find_icon_dirs(XDG_DATA_HOME, all_dirs);
+	find_icon_dirs(all_dirs);
 
 	Dir *start = all_dirs, *tmp;
 	for (start = all_dirs; start->next; start = start->next) ;
@@ -510,6 +510,7 @@ int main(int argc, char *argv[])
 	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
 	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", "~/.config", SLEN);
 	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
+	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
 
 	int c;
 	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
