@@ -53,6 +53,7 @@ typedef struct App {
 	char name[SLEN];
 	char path[MLEN];
 	int terminal;
+	int not_show;
 } App;
 
 typedef struct MenuEntry {
@@ -146,7 +147,6 @@ void find_icon_dirs(char *data_dirs, Dir *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
-int if_show(void *user, const char *section, const char *name, const char *value);
 int set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
@@ -279,6 +279,16 @@ int get_app(void *user, const char *section, const char *name, const char *value
 			strcpy(app->categories, value);
 		else if (strcmp(name, "Path") == 0)
 			strcpy(app->path, value);
+
+		if ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
+			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
+			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
+				&& check_desktop(XDG_CURRENT_DESKTOP, value))
+			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
+				&& !check_desktop(XDG_CURRENT_DESKTOP, value)))
+			app->not_show = 1;
 	}
 	return 1;
 }
@@ -329,25 +339,6 @@ int set_icon_theme_handler(void *user, const char *section, const char *name, co
 	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
 		strcpy(user, value);
 	return 1;
-}
-
-/* Handler for ini_parse, check if this application needs to show
- * Set *user to 0 (False) if some criterions are met
- **/
-int if_show(void *user, const char *section, const char *name, const char *value)
-{
-	int *flag = (int *)user;
-	if (strcmp(section, "Desktop Entry") == 0
-		&& ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
-			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
-			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
-				&& check_desktop(XDG_CURRENT_DESKTOP, value))
-			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
-				&& !check_desktop(XDG_CURRENT_DESKTOP, value))))
-		*flag = 0;
-	return 1;  /* success */
 }
 
 /*
@@ -417,7 +408,7 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 
 void show_xdg_menu(FILE *xmenu_input)
 {
-	int if_show_flag, res, icon_theme_need_free;
+	int res, icon_theme_need_free;
 	App app;
 	MenuEntry menuentry;
 	char *folder = "/usr/share/applications", path[LLEN];
@@ -449,14 +440,13 @@ void show_xdg_menu(FILE *xmenu_input)
 		}
 		sprintf(path, "%s/%s", folder, entry->d_name);
 
-		if_show_flag = 1;
-		if ((res = ini_parse(path, if_show, &if_show_flag)) < 0)
-			fprintf(stderr, "Desktop file parse failed: %d\n", res);
-
 		memset(&app, 0, sizeof(App));
 		strcpy(app.entry_path, path);
 		if ((res = ini_parse(path, get_app, &app)) < 0)
 			fprintf(stderr, "Desktop file parse failed: %d\n", res);
+
+		if (app.not_show)
+			continue;
 
 		gen_entry(&app, &menuentry);
 		if (option.dump)
