@@ -21,8 +21,8 @@
 #define MLEN 256
 /* for simple names or directories */
 #define SLEN 128
-/* for part in string.split(delimiter) */
-#define FOR_SPLIT(P, S, D) for (P = strtok(S, D); P; P = strtok(NULL, D))
+/* similar to "for X in S.split(D)" in python */
+#define FOR_SPLIT(X, S, D) for (X = strtok(strdup(S), D); X; X = strtok(NULL, D))
 
 struct Option {
 	char *fallback_icon;
@@ -162,15 +162,14 @@ int check_desktop(char *current_desktop, const char *desktop_list) {
 
 int check_exec(const char *cmd)
 {
-	char file[MLEN], path_env[LLEN], *dir;
+	char file[MLEN], *dir;
 	struct stat sb;
 
 	/* if command start with '/', check it directly */
 	if (cmd[0] == '/')
 		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
 
-	strncpy(path_env, PATH, LLEN);
-	FOR_SPLIT (dir, path_env, ":") {
+	FOR_SPLIT (dir, PATH, ":") {
 		sprintf(file, "%s/%s", dir, cmd);
 		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
 			return 1;
@@ -197,11 +196,9 @@ void find_icon(char *icon_path, char *icon_name)
 void find_icon_dirs(char *data_dirs, Dir *dirs)
 {
 	int res, len_parent;
-	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0}, data_dirs_copy[LLEN] = {0};
+	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
 
-	/* strtok (see FOR_SPLIT) changes the string, so use a copy */
-	strncpy(data_dirs_copy, data_dirs, LLEN);
-	FOR_SPLIT (dir, data_dirs_copy, ":") {
+	FOR_SPLIT (dir, data_dirs, ":") {
 		/* dir is now a data directory */
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
