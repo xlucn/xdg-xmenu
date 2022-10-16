@@ -131,14 +131,14 @@ char XDG_CURRENT_DESKTOP[SLEN];
 char DATA_DIRS[LLEN + MLEN];
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
-List all_dirs, path_list, data_dirs_list, current_desktop_list;
+List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
 int check_desktop(const char *show_in_list);
 int check_exec(const char *cmd);
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
-void find_icon_dirs(List *dirs);
+void find_icon_dirs();
 void gen_entry(App *app);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
@@ -179,7 +179,7 @@ void find_icon(char *icon_path, char *icon_name)
 	char test_path[MLEN];
 	static const char *exts[] = {"svg", "png", "xpm"};
 
-	for (List *dir = all_dirs.next; dir; dir = dir->next) {
+	for (List *dir = icon_dirs.next; dir; dir = dir->next) {
 		for (int i = 0; i < 3; i++) {
 			snprintf(test_path, MLEN, "%s/%s.%s", dir->text, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
@@ -191,30 +191,28 @@ void find_icon(char *icon_path, char *icon_name)
 	strncpy(icon_path, FALLBACK_ICON_PATH, MLEN);
 }
 
-void find_icon_dirs(List *dirs)
+void find_icon_dirs()
 {
 	int res, len_parent;
 	char dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
 
-	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
-		/* dir is now a data directory */
-		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
+	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
+		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", data_dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
-			if ((res = ini_parse(index_theme, collect_icon_subdir, dirs)) < 0)
+			if ((res = ini_parse(index_theme, collect_icon_subdir, &icon_dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 			/* mannually call. a hack to process the end of file */
-			collect_icon_subdir(dirs, "", NULL, NULL);
+			collect_icon_subdir(&icon_dirs, "", NULL, NULL);
 		}
 
 		/* prepend dirs with parent path */
-		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir->text, option.icon_theme);
-		while (dirs->next) {
+		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", data_dir->text, option.icon_theme);
+		for (List *dir = icon_dirs.next; dir; dir = dir->next) {
 			/* FIXME: This is hacky, change this */
-			if (dirs->text[0] != '/') {
-				strncpy(dirs->text + len_parent, dirs->text, strlen(dirs->text));
-				memcpy(dirs->text, dir_parent, strlen(dir_parent));
+			if (dir->text[0] != '/') {
+				strncpy(dir->text + len_parent, dir->text, strlen(dir->text));
+				memcpy(dir->text, dir_parent, strlen(dir_parent));
 			}
-			dirs = dirs->next;
 		}
 	}
 }
@@ -428,8 +426,8 @@ void show_xdg_menu(int fd)
 
 	icon_theme_need_free = set_icon_theme();
 
-	find_icon_dirs(&all_dirs);
-	list_insert(&all_dirs, "/usr/share/pixmaps", SLEN);
+	find_icon_dirs();
+	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
 
 	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
@@ -467,7 +465,6 @@ void show_xdg_menu(int fd)
 
 	if (icon_theme_need_free)
 		free(option.icon_theme);
-	list_free(&all_dirs);
 }
 
 /*
@@ -570,5 +567,6 @@ int main(int argc, char *argv[])
 		close(s.readfd);
 	}
 
+	list_free(&icon_dirs);
 	return 0;
 }
