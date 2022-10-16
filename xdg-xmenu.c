@@ -434,21 +434,18 @@ void show_xdg_menu(int fd)
 	/* output all app in folder */
 	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
 		sprintf(folder, "%s/applications", data_dir->text);
-		if ((dir = opendir(folder)) == NULL) {
+		if ((dir = opendir(folder)) == NULL)
 			continue;
-		}
 
 		while ((entry = readdir(dir)) != NULL) {
-			if (strstr(entry->d_name, ".desktop") == NULL) {
+			if (strcmp(strrchr(entry->d_name, '.'), ".desktop") != 0)
 				continue;
-			}
-			sprintf(path, "%s/%s", folder, entry->d_name);
 
 			app = calloc(sizeof(App), 1);
+			sprintf(path, "%s/%s", folder, entry->d_name);
 			strcpy(app->entry_path, path);
 			if ((res = ini_parse(path, get_app, app)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
-
 
 			if (!app->not_show) {
 				gen_entry(app);
@@ -458,9 +455,7 @@ void show_xdg_menu(int fd)
 					write(fd, app->xmenu_entry, strlen(app->xmenu_entry));
 			}
 		}
-
-		if (dir)
-			closedir(dir);
+		closedir(dir);
 	}
 
 	if (icon_theme_need_free)
@@ -476,8 +471,8 @@ void show_xdg_menu(int fd)
 spawn_t spawn(const char *cmd, char *const argv[])
 {
 	pid_t pid;
-	spawn_t status = { -1, -1, -1 };
-	int pfd_read[2] = { -1, -1 }, pfd_write[2] = { -1, -1 };
+	spawn_t status = {-1, -1, -1};
+	int pfd_read[2] = {-1, -1}, pfd_write[2] = {-1, -1};
 
 	pipe(pfd_read);
 	pipe(pfd_write);
@@ -516,21 +511,11 @@ void split_env(List *list, char *env_string)
 
 int main(int argc, char *argv[])
 {
-	getenv_fb(PATH, "PATH", NULL, LLEN);
-	getenv_fb(HOME, "HOME", NULL, SLEN);
-	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
-	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
-	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
-	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
-	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
+	int opt;
+	char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
 
-	split_env(&path_list, PATH);
-	split_env(&data_dirs_list, DATA_DIRS);
-	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
-
-	int c;
-	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
-		switch (c) {
+	while ((opt = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
+		switch (opt) {
 			case 'b': option.fallback_icon = optarg; break;
 			case 'd': option.dump = 1; break;
 			case 'e': option.xdg_de = 1; break;
@@ -546,10 +531,22 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	getenv_fb(PATH, "PATH", NULL, LLEN);
+	getenv_fb(HOME, "HOME", NULL, SLEN);
+	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
+	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
+	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
+	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
+	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
+
+	/* NOTE: the string in the second argument will be modified, do not use again */
+	split_env(&path_list, PATH);
+	split_env(&data_dirs_list, DATA_DIRS);
+	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+
 	if (option.dump) {
 		show_xdg_menu(0);
 	} else {
-		char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
 		spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
 		show_xdg_menu(s.writefd);
 		close(s.writefd);
@@ -568,5 +565,8 @@ int main(int argc, char *argv[])
 	}
 
 	list_free(&icon_dirs);
+	list_free(&path_list);
+	list_free(&data_dirs_list);
+	list_free(&current_desktop_list);
 	return 0;
 }
