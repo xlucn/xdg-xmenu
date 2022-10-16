@@ -448,6 +448,8 @@ void show_xdg_menu(int fd)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 
 			if (!app->not_show) {
+				app->next = all_apps.next;
+				all_apps.next = app;
 				gen_entry(app);
 				if (option.dump)
 					printf("%s", app->xmenu_entry);
