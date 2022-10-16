@@ -62,10 +62,10 @@ typedef struct MenuEntry {
 	struct MenuEntry *next;
 } MenuEntry;
 
-typedef struct Dir {
-	char dir[SLEN];
-	struct Dir *next;
-} Dir;
+typedef struct List {
+	char text[SLEN];
+	struct List *next;
+} List;
 
 typedef struct spawn_t {
 	int readfd;
@@ -138,16 +138,18 @@ char DATA_DIRS[LLEN + MLEN];
 char *exts[] = {"svg", "png", "xpm"};
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
-Dir *all_dirs;
+List all_dirs, path_list, data_dirs_list, current_desktop_list;
 
 int check_desktop(char *current_desktop, const char *show_in_list);
 int check_exec(const char *cmd);
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
-void find_icon_dirs(Dir *dirs);
+void find_icon_dirs(List *dirs);
 void gen_entry(App *app, MenuEntry *entry);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
+void list_insert(List *list, char *text, int n);
+void list_free(List *list);
 int set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
@@ -182,9 +184,9 @@ void find_icon(char *icon_path, char *icon_name)
 {
 	char test_path[MLEN];
 
-	for (Dir *d = all_dirs; d && d->next; d = d->next) {
+	for (List *d = all_dirs.next; d && d->next; d = d->next) {
 		for (int i = 0; i < sizeof(exts) / sizeof(exts[0]); i++) {
-			snprintf(test_path, MLEN, "%s/%s.%s", d->dir, icon_name, exts[i]);
+			snprintf(test_path, MLEN, "%s/%s.%s", d->text, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
 				strncpy(icon_path, test_path, MLEN);
 				return;
@@ -194,7 +196,7 @@ void find_icon(char *icon_path, char *icon_name)
 	strncpy(icon_path, FALLBACK_ICON_PATH, MLEN);
 }
 
-void find_icon_dirs(Dir *dirs)
+void find_icon_dirs(List *dirs)
 {
 	int res, len_parent;
 	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
@@ -213,9 +215,9 @@ void find_icon_dirs(Dir *dirs)
 		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir, option.icon_theme);
 		while (dirs->next) {
 			/* FIXME: This is hacky, change this */
-			if (dirs->dir[0] != '/') {
-				strncpy(dirs->dir + len_parent, dirs->dir, strlen(dirs->dir));
-				memcpy(dirs->dir, dir_parent, strlen(dir_parent));
+			if (dirs->text[0] != '/') {
+				strncpy(dirs->text + len_parent, dirs->text, strlen(dirs->text));
+				memcpy(dirs->text, dir_parent, strlen(dir_parent));
 			}
 			dirs = dirs->next;
 		}
@@ -297,18 +299,37 @@ int get_app(void *user, const char *section, const char *name, const char *value
 /* getenv with fallback value */
 void getenv_fb(char *dest, char *name, char *fallback, int n)
 {
-	char *tmp;
+	char *env;
 
-	tmp = getenv(name);
-	if (tmp == NULL || strlen(tmp) == 0)
-		if (fallback == NULL)
-			return;
-		else if (strstr(fallback, "~/") == fallback)
-			snprintf(dest, n, "%s/%s", HOME, fallback + 2);
+	if ((env = getenv(name))) {
+		strncpy(dest, env, n);
+	} else if (fallback) {
+		if (fallback[0] != '/')  /* relative path to $HOME */
+			snprintf(dest, n, "%s/%s", HOME, fallback);
 		else
 			strncpy(dest, fallback, n);
-	else
-		strncpy(dest, tmp, n);
+	}
+}
+
+void list_insert(List *list, char *text, int n)
+{
+	List *tmp = malloc(sizeof(List));
+	strncpy(tmp->text, text, n);
+	tmp->next = list->next;
+	list->next = tmp;
+}
+
+void list_free(List *list)
+{
+	List *p, *tmp;
+
+	p = list->next;
+	list->next = NULL;
+	while (p) {
+		tmp = p->next;
+		free(p);
+		p = tmp;
+	}
 }
 
 int set_icon_theme()
@@ -354,7 +375,7 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 	static char subdir[32], type[16];
 	static int size, minsize, maxsize, threshold, scale;
 
-	Dir *dirs = (Dir *)user;
+	List *dirs = (List *)user;
 	while (dirs->next != NULL)
 		dirs = dirs->next;
 
@@ -369,10 +390,7 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 					&& minsize <= option.icon_size
 					&& maxsize >= option.icon_size)) {
 				/* save dirs into this linked list */
-				strncpy(dirs->dir, subdir, SLEN);
-				dirs->next = calloc(sizeof(Dir), 1);
-				dirs = dirs->next;
-				dirs->next = NULL;
+				list_insert(dirs, subdir, SLEN);
 			}
 
 		/* reset the current section */
@@ -418,14 +436,8 @@ void show_xdg_menu(FILE *xmenu_input)
 
 	icon_theme_need_free = set_icon_theme();
 
-	all_dirs = calloc(sizeof(Dir), 1);
-	find_icon_dirs(all_dirs);
-
-	Dir *start = all_dirs, *tmp;
-	for (start = all_dirs; start->next; start = start->next) ;
-	start->next = calloc(sizeof(Dir), 1);
-	start = start->next;
-	strcpy(start->dir, "/usr/share/pixmaps");
+	find_icon_dirs(&all_dirs);
+	list_insert(&all_dirs, "/usr/share/pixmaps", SLEN);
 
 	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
@@ -460,11 +472,7 @@ void show_xdg_menu(FILE *xmenu_input)
 
 	if (icon_theme_need_free)
 		free(option.icon_theme);
-	while (start->next) {
-		tmp = start->next;
-		free(start);
-		start = tmp;
-	}
+	list_free(&all_dirs);
 }
 
 /*
@@ -506,9 +514,9 @@ int main(int argc, char *argv[])
 {
 	getenv_fb(PATH, "PATH", NULL, LLEN);
 	getenv_fb(HOME, "HOME", NULL, SLEN);
-	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", "~/.local/share", SLEN);
+	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
 	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
-	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", "~/.config", SLEN);
+	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
 	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
 	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
 
