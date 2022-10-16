@@ -565,8 +565,11 @@ int main(int argc, char *argv[])
 		if (read(s.readfd, line, LLEN) > 0) {
 			if (option.dry_run) {
 				printf("%s", line);
-			else
+			} else {
+				*strchr(line, '\n') = 0;
+				strcat(line, " &");
 				system(line);
+			}
 		}
 		close(s.readfd);
 	}
