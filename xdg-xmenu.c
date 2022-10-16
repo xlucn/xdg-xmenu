@@ -256,9 +256,9 @@ void gen_entry(App *app, MenuEntry *entry)
 		strcpy(name, app->name);
 
 	if (option.no_icon)
-		sprintf(entry->text, "\t%s\t%s", name, command);
+		sprintf(entry->text, "\t%s\t%s\n", name, command);
 	else
-		sprintf(entry->text, "\tIMG:%s\t%s\t%s", icon_path, name, command);
+		sprintf(entry->text, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
 }
 
 /* Handler for ini_parse, parse app info and save in App variable pointed by *user */
@@ -421,7 +421,7 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 	return 1;
 }
 
-void show_xdg_menu(FILE *xmenu_input)
+void show_xdg_menu(int fd)
 {
 	int res, icon_theme_need_free;
 	App app;
@@ -460,9 +460,9 @@ void show_xdg_menu(FILE *xmenu_input)
 
 			gen_entry(&app, &menuentry);
 			if (option.dump)
-				printf("%s\n", menuentry.text);
+				printf("%s", menuentry.text);
 			else
-				fprintf(xmenu_input, "%s\n", menuentry.text);
+				write(fd, menuentry.text, strlen(menuentry.text));
 		}
 
 		if (dir)
@@ -554,28 +554,20 @@ int main(int argc, char *argv[])
 	}
 
 	if (option.dump) {
-		show_xdg_menu(NULL);
+		show_xdg_menu(0);
 	} else {
-		/* FIXME: check return */
-		char *xmenu_argv[] = {NULL}, line[1024] = {0};
-		FILE *fwrite, *fread;
-		/* TODO: maybe use -- to split xdg-xmenu and xmenu args? */
+		char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
 		spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
-
-		fwrite = fdopen(s.writefd, "w");
-		show_xdg_menu(fwrite);
-		fclose(fwrite);
+		show_xdg_menu(s.writefd);
+		close(s.writefd);
 
 		waitpid(s.pid, NULL, 0);
-		fread = fdopen(s.readfd, "r");
-		if (fgets(line, 1024, fread)) {
-			if (option.dry_run)
+		if (read(s.readfd, line, LLEN) > 0) {
+			if (option.dry_run) {
 				printf("%s", line);
 			else
 				system(line);
 		}
-
-		close(s.writefd);
 		close(s.readfd);
 	}
 
