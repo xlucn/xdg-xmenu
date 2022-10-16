@@ -21,8 +21,6 @@
 #define MLEN 256
 /* for simple names or directories */
 #define SLEN 128
-/* similar to "for X in S.split(D)" in python */
-#define FOR_SPLIT(X, S, D) for (X = strtok(strdup(S), D); X; X = strtok(NULL, D))
 
 struct Option {
 	char *fallback_icon;
@@ -135,12 +133,11 @@ char XDG_DATA_DIRS[LLEN];
 char XDG_CONFIG_HOME[SLEN];
 char XDG_CURRENT_DESKTOP[SLEN];
 char DATA_DIRS[LLEN + MLEN];
-char *exts[] = {"svg", "png", "xpm"};
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
 List all_dirs, path_list, data_dirs_list, current_desktop_list;
 
-int check_desktop(char *current_desktop, const char *show_in_list);
+int check_desktop(const char *show_in_list);
 int check_exec(const char *cmd);
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
@@ -154,26 +151,26 @@ int set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
+void split_env(List *list, char *env_string);
 
-int check_desktop(char *current_desktop, const char *desktop_list) {
-	char *desktop;
-	FOR_SPLIT (desktop, current_desktop, ":")
-		if (strstr(desktop_list, desktop))
+int check_desktop(const char *desktop_list) {
+	for (List *desktop = current_desktop_list.next; desktop; desktop = desktop->next)
+		if (strstr(desktop_list, desktop->text))
 			return 1;
 	return 0;
 }
 
 int check_exec(const char *cmd)
 {
-	char file[MLEN], *dir;
+	char file[MLEN];
 	struct stat sb;
 
 	/* if command start with '/', check it directly */
 	if (cmd[0] == '/')
 		return stat(cmd, &sb) == 0 && sb.st_mode & S_IXUSR;
 
-	FOR_SPLIT (dir, PATH, ":") {
-		sprintf(file, "%s/%s", dir, cmd);
+	for (List *dir = path_list.next; dir; dir = dir->next) {
+		sprintf(file, "%s/%s", dir->text, cmd);
 		if (stat(file, &sb) == 0 && sb.st_mode & S_IXUSR)
 			return 1;
 	}
@@ -183,10 +180,11 @@ int check_exec(const char *cmd)
 void find_icon(char *icon_path, char *icon_name)
 {
 	char test_path[MLEN];
+	static const char *exts[] = {"svg", "png", "xpm"};
 
-	for (List *d = all_dirs.next; d && d->next; d = d->next) {
-		for (int i = 0; i < sizeof(exts) / sizeof(exts[0]); i++) {
-			snprintf(test_path, MLEN, "%s/%s.%s", d->text, icon_name, exts[i]);
+	for (List *dir = all_dirs.next; dir; dir = dir->next) {
+		for (int i = 0; i < 3; i++) {
+			snprintf(test_path, MLEN, "%s/%s.%s", dir->text, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
 				strncpy(icon_path, test_path, MLEN);
 				return;
@@ -199,11 +197,11 @@ void find_icon(char *icon_path, char *icon_name)
 void find_icon_dirs(List *dirs)
 {
 	int res, len_parent;
-	char *dir, dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
+	char dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
 
-	FOR_SPLIT (dir, DATA_DIRS, ":") {
+	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
 		/* dir is now a data directory */
-		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir, option.icon_theme);
+		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
 			if ((res = ini_parse(index_theme, collect_icon_subdir, dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
@@ -212,7 +210,7 @@ void find_icon_dirs(List *dirs)
 		}
 
 		/* prepend dirs with parent path */
-		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir, option.icon_theme);
+		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir->text, option.icon_theme);
 		while (dirs->next) {
 			/* FIXME: This is hacky, change this */
 			if (dirs->text[0] != '/') {
@@ -287,10 +285,8 @@ int get_app(void *user, const char *section, const char *name, const char *value
 			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
 			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
-			|| (option.xdg_de && strcmp(name, "NotShowIn") == 0
-				&& check_desktop(XDG_CURRENT_DESKTOP, value))
-			|| (option.xdg_de && strcmp(name, "OnlyShowIn") == 0
-				&& !check_desktop(XDG_CURRENT_DESKTOP, value)))
+			|| (strcmp(name, "NotShowIn") == 0 && check_desktop(value))
+			|| (strcmp(name, "OnlyShowIn") == 0 && !check_desktop(value)))
 			app->not_show = 1;
 	}
 	return 1;
@@ -430,7 +426,7 @@ void show_xdg_menu(FILE *xmenu_input)
 	int res, icon_theme_need_free;
 	App app;
 	MenuEntry menuentry;
-	char *folder = "/usr/share/applications", path[LLEN];
+	char folder[MLEN] = {0}, path[LLEN] = {0};
 	DIR *dir;
 	struct dirent *entry;
 
@@ -442,33 +438,36 @@ void show_xdg_menu(FILE *xmenu_input)
 	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
 	/* output all app in folder */
-	if ((dir = opendir(folder)) == NULL) {
-		fprintf(stderr, "Open dir failed: %s\n", folder);
-	}
-
-	while ((entry = readdir(dir)) != NULL) {
-		if (strstr(entry->d_name, ".desktop") == NULL) {
+	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
+		sprintf(folder, "%s/applications", data_dir->text);
+		if ((dir = opendir(folder)) == NULL) {
 			continue;
 		}
-		sprintf(path, "%s/%s", folder, entry->d_name);
 
-		memset(&app, 0, sizeof(App));
-		strcpy(app.entry_path, path);
-		if ((res = ini_parse(path, get_app, &app)) < 0)
-			fprintf(stderr, "Desktop file parse failed: %d\n", res);
+		while ((entry = readdir(dir)) != NULL) {
+			if (strstr(entry->d_name, ".desktop") == NULL) {
+				continue;
+			}
+			sprintf(path, "%s/%s", folder, entry->d_name);
 
-		if (app.not_show)
-			continue;
+			memset(&app, 0, sizeof(App));
+			strcpy(app.entry_path, path);
+			if ((res = ini_parse(path, get_app, &app)) < 0)
+				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 
-		gen_entry(&app, &menuentry);
-		if (option.dump)
-			printf("%s\n", menuentry.text);
-		else
-			fprintf(xmenu_input, "%s\n", menuentry.text);
+			if (app.not_show)
+				continue;
+
+			gen_entry(&app, &menuentry);
+			if (option.dump)
+				printf("%s\n", menuentry.text);
+			else
+				fprintf(xmenu_input, "%s\n", menuentry.text);
+		}
+
+		if (dir)
+			closedir(dir);
 	}
-
-	if (dir)
-		closedir(dir);
 
 	if (icon_theme_need_free)
 		free(option.icon_theme);
@@ -510,6 +509,18 @@ spawn_t spawn(const char *cmd, char *const argv[])
 	return status;
 }
 
+void split_env(List *list, char *env_string)
+{
+	List *tmp;
+
+	for (char *p = strtok(env_string, ":"); p; p = strtok(NULL, ":")) {
+		tmp = (List *)malloc(sizeof(List));
+		strncpy(tmp->text, p, SLEN);
+		tmp->next = list->next;
+		list->next = tmp;
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	getenv_fb(PATH, "PATH", NULL, LLEN);
@@ -519,6 +530,10 @@ int main(int argc, char *argv[])
 	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
 	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
 	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
+
+	split_env(&path_list, PATH);
+	split_env(&data_dirs_list, DATA_DIRS);
+	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
 
 	int c;
 	while ((c = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
