@@ -52,13 +52,9 @@ typedef struct App {
 	char path[MLEN];
 	int terminal;
 	int not_show;
+	char xmenu_entry[LLEN];
+	struct App *next;
 } App;
-
-typedef struct MenuEntry {
-	char category[SLEN];
-	char text[LLEN];
-	struct MenuEntry *next;
-} MenuEntry;
 
 typedef struct List {
 	char text[SLEN];
@@ -136,13 +132,14 @@ char DATA_DIRS[LLEN + MLEN];
 char FALLBACK_ICON_PATH[MLEN];
 char *FALLBACK_ICON_THEME = "hicolor";
 List all_dirs, path_list, data_dirs_list, current_desktop_list;
+App all_apps;
 
 int check_desktop(const char *show_in_list);
 int check_exec(const char *cmd);
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs(List *dirs);
-void gen_entry(App *app, MenuEntry *entry);
+void gen_entry(App *app);
 int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
 void list_insert(List *list, char *text, int n);
@@ -222,7 +219,7 @@ void find_icon_dirs(List *dirs)
 	}
 }
 
-void gen_entry(App *app, MenuEntry *entry)
+void gen_entry(App *app)
 {
 	char *perc, field, replace_str[MLEN];
 	char icon_path[MLEN], name[MLEN + 4], command[MLEN + SLEN], buffer[MLEN];
@@ -256,9 +253,9 @@ void gen_entry(App *app, MenuEntry *entry)
 		strcpy(name, app->name);
 
 	if (option.no_icon)
-		sprintf(entry->text, "\t%s\t%s\n", name, command);
+		sprintf(app->xmenu_entry, "\t%s\t%s\n", name, command);
 	else
-		sprintf(entry->text, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
+		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
 }
 
 /* Handler for ini_parse, parse app info and save in App variable pointed by *user */
@@ -424,11 +421,10 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 void show_xdg_menu(int fd)
 {
 	int res, icon_theme_need_free;
-	App app;
-	MenuEntry menuentry;
 	char folder[MLEN] = {0}, path[LLEN] = {0};
 	DIR *dir;
 	struct dirent *entry;
+	App *app;
 
 	icon_theme_need_free = set_icon_theme();
 
@@ -450,19 +446,19 @@ void show_xdg_menu(int fd)
 			}
 			sprintf(path, "%s/%s", folder, entry->d_name);
 
-			memset(&app, 0, sizeof(App));
-			strcpy(app.entry_path, path);
-			if ((res = ini_parse(path, get_app, &app)) < 0)
+			app = calloc(sizeof(App), 1);
+			strcpy(app->entry_path, path);
+			if ((res = ini_parse(path, get_app, app)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 
-			if (app.not_show)
-				continue;
 
-			gen_entry(&app, &menuentry);
-			if (option.dump)
-				printf("%s", menuentry.text);
-			else
-				write(fd, menuentry.text, strlen(menuentry.text));
+			if (!app->not_show) {
+				gen_entry(app);
+				if (option.dump)
+					printf("%s", app->xmenu_entry);
+				else
+					write(fd, app->xmenu_entry, strlen(app->xmenu_entry));
+			}
 		}
 
 		if (dir)
