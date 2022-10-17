@@ -136,6 +136,7 @@ App all_apps;
 
 int check_desktop(const char *show_in_list);
 int check_exec(const char *cmd);
+void clean_up();
 int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
@@ -144,6 +145,7 @@ int get_app(void *user, const char *section, const char *name, const char *value
 void getenv_fb(char *dest, char *name, char *fallback, int n);
 void list_insert(List *list, char *text, int n);
 void list_free(List *list);
+void prepare_envvars();
 void set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
@@ -172,6 +174,14 @@ int check_exec(const char *cmd)
 			return 1;
 	}
 	return 0;
+}
+
+void clean_up()
+{
+	list_free(&icon_dirs);
+	list_free(&path_list);
+	list_free(&data_dirs_list);
+	list_free(&current_desktop_list);
 }
 
 void find_icon(char *icon_path, char *icon_name)
@@ -215,6 +225,8 @@ void find_icon_dirs()
 			}
 		}
 	}
+
+	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
 }
 
 void gen_entry(App *app)
@@ -316,6 +328,22 @@ void list_free(List *list)
 	list->next = NULL;
 }
 
+void prepare_envvars()
+{
+	getenv_fb(PATH, "PATH", NULL, LLEN);
+	getenv_fb(HOME, "HOME", NULL, SLEN);
+	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
+	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
+	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
+	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
+	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
+
+	/* NOTE: the string in the second argument will be modified, do not use again */
+	split_env(&path_list, PATH);
+	split_env(&data_dirs_list, DATA_DIRS);
+	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+}
+
 void set_icon_theme()
 {
 	int res;
@@ -360,17 +388,16 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 
 	if (strcmp(section, subdir) != 0 || (!name && !value)) {
 		/* Check the icon size after finished parsing a section */
-		if (scale == option.scale)
-			if (((strcmp(type, "Threshold") == 0 || strlen(type) == 0)
+		if (scale == option.scale
+			&& (((strcmp(type, "Threshold") == 0 || strlen(type) == 0)
 					&& abs(size - option.icon_size) <= threshold)
 				|| (strcmp(type, "Fixed") == 0
 					&& size == option.icon_size)
 				|| (strcmp(type, "Scalable") == 0
 					&& minsize <= option.icon_size
-					&& maxsize >= option.icon_size)) {
-				/* save dirs into this linked list */
-				list_insert(dirs, subdir, SLEN);
-			}
+					&& maxsize >= option.icon_size)))
+			/* save dirs into this linked list */
+			list_insert(dirs, subdir, SLEN);
 
 		/* reset the current section */
 		strncpy(subdir, section, 32);
@@ -411,11 +438,6 @@ void show_xdg_menu(int fd)
 	DIR *dir;
 	struct dirent *entry;
 	App *app;
-
-	find_icon_dirs();
-	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
-
-	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
 	/* output all app in folder */
 	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
@@ -516,19 +538,10 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	getenv_fb(PATH, "PATH", NULL, LLEN);
-	getenv_fb(HOME, "HOME", NULL, SLEN);
-	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
-	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
-	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
-	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
-	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
-
-	/* NOTE: the string in the second argument will be modified, do not use again */
-	split_env(&path_list, PATH);
-	split_env(&data_dirs_list, DATA_DIRS);
-	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+	prepare_envvars();
 	set_icon_theme();
+	find_icon_dirs();
+	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 
 	if (option.dump) {
 		show_xdg_menu(0);
@@ -550,9 +563,5 @@ int main(int argc, char *argv[])
 		close(s.readfd);
 	}
 
-	list_free(&icon_dirs);
-	list_free(&path_list);
-	list_free(&data_dirs_list);
-	list_free(&current_desktop_list);
 	return 0;
 }
