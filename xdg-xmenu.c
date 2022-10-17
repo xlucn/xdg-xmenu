@@ -130,7 +130,7 @@ char XDG_CONFIG_HOME[SLEN];
 char XDG_CURRENT_DESKTOP[SLEN];
 char DATA_DIRS[LLEN + MLEN];
 char FALLBACK_ICON_PATH[MLEN];
-char *FALLBACK_ICON_THEME = "hicolor";
+char FALLBACK_ICON_THEME[SLEN] = "hicolor";
 List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
@@ -144,7 +144,7 @@ int get_app(void *user, const char *section, const char *name, const char *value
 void getenv_fb(char *dest, char *name, char *fallback, int n);
 void list_insert(List *list, char *text, int n);
 void list_free(List *list);
-int set_icon_theme();
+void set_icon_theme();
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
@@ -316,34 +316,29 @@ void list_free(List *list)
 	list->next = NULL;
 }
 
-int set_icon_theme()
+void set_icon_theme()
 {
 	int res;
-	char gtk3_settings[MLEN] = {0}, *real_path, *buffer;
+	char gtk3_settings[MLEN] = {0}, *real_path;
 
 	if (option.icon_theme && strlen(option.icon_theme) > 0)
-		return 0;
+		return;
+	option.icon_theme = FALLBACK_ICON_THEME;
 
-	buffer = malloc(SLEN);
+	/* Check gtk3 settings.ini file and overwrite default icon theme */
 	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
-		if ((res = ini_parse(real_path, set_icon_theme_handler, buffer)) < 0)
+		if ((res = ini_parse(real_path, set_icon_theme_handler, NULL)) < 0)
 			fprintf(stderr, "failed parse gtk settings\n");
 		free(real_path);
 	}
-
-	if (strlen(buffer) == 0)
-		option.icon_theme = FALLBACK_ICON_THEME;
-	else
-		option.icon_theme = buffer;
-	return 1;
 }
 
 int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value)
 {
 	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
-		strcpy(user, value);
+		strcpy(FALLBACK_ICON_THEME, value);
 	return 1;
 }
 
@@ -411,13 +406,11 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 
 void show_xdg_menu(int fd)
 {
-	int res, icon_theme_need_free;
+	int res;
 	char folder[MLEN] = {0}, path[LLEN] = {0};
 	DIR *dir;
 	struct dirent *entry;
 	App *app;
-
-	icon_theme_need_free = set_icon_theme();
 
 	find_icon_dirs();
 	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
@@ -452,9 +445,6 @@ void show_xdg_menu(int fd)
 		}
 		closedir(dir);
 	}
-
-	if (icon_theme_need_free)
-		free(option.icon_theme);
 }
 
 /*
@@ -538,6 +528,7 @@ int main(int argc, char *argv[])
 	split_env(&path_list, PATH);
 	split_env(&data_dirs_list, DATA_DIRS);
 	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+	set_icon_theme();
 
 	if (option.dump) {
 		show_xdg_menu(0);
