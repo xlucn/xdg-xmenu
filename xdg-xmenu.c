@@ -43,16 +43,18 @@ struct Option {
 };
 
 typedef struct App {
+	/* from desktop entry file */
 	char categories[LLEN];
-	char entry_path[MLEN];
 	char exec[MLEN];
 	char genericname[SLEN];
 	char icon[SLEN];
 	char name[SLEN];
 	char path[MLEN];
 	int terminal;
-	int not_show;
+	/* derived attributes */
+	char entry_path[MLEN];
 	char xmenu_entry[LLEN];
+	int not_show;
 	struct App *next;
 } App;
 
@@ -134,20 +136,20 @@ char FALLBACK_ICON_THEME[SLEN] = "hicolor";
 List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
-int check_desktop(const char *show_in_list);
+int check_desktop(const char *desktop_list);
 int check_exec(const char *cmd);
 void clean_up();
-int collect_icon_subdir(void *user, const char *section, const char *name, const char *value);
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
 void gen_entry(App *app);
-int get_app(void *user, const char *section, const char *name, const char *value);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
-void list_insert(List *list, char *text, int n);
+int handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value);
+int handler_parse_app(void *user, const char *section, const char *name, const char *value);
+int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
 void list_free(List *list);
+void list_insert(List *list, char *text, int n);
 void prepare_envvars();
 void set_icon_theme();
-int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value);
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
 void split_env(List *list, char *env_string);
@@ -209,10 +211,10 @@ void find_icon_dirs()
 	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", data_dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
-			if ((res = ini_parse(index_theme, collect_icon_subdir, &icon_dirs)) < 0)
+			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, &icon_dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 			/* mannually call. a hack to process the end of file */
-			collect_icon_subdir(&icon_dirs, "", NULL, NULL);
+			handler_icon_dirs_theme(&icon_dirs, "", NULL, NULL);
 		}
 
 		/* prepend dirs with parent path */
@@ -268,37 +270,6 @@ void gen_entry(App *app)
 		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
 }
 
-/* Handler for ini_parse, parse app info and save in App variable pointed by *user */
-int get_app(void *user, const char *section, const char *name, const char *value)
-{
-	App *app = (App *)user;
-	if (strcmp(section, "Desktop Entry") == 0) {
-		if (strcmp(name, "Exec") == 0)
-			strcpy(app->exec, value);
-		else if (strcmp(name, "Icon") == 0)
-			strcpy(app->icon, value);
-		else if (strcmp(name, "Name") == 0)
-			strcpy(app->name, value);
-		else if (strcmp(name, "Terminal") == 0)
-			app->terminal = strcmp(value, "true") == 0;
-		else if (strcmp(name, "GenericName") == 0)
-			strcpy(app->genericname, value);
-		else if (strcmp(name, "Categories") == 0)
-			strcpy(app->categories, value);
-		else if (strcmp(name, "Path") == 0)
-			strcpy(app->path, value);
-
-		if ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
-			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
-			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
-			|| (strcmp(name, "NotShowIn") == 0 && check_desktop(value))
-			|| (strcmp(name, "OnlyShowIn") == 0 && !check_desktop(value)))
-			app->not_show = 1;
-	}
-	return 1;
-}
-
 /* getenv with fallback value */
 void getenv_fb(char *dest, char *name, char *fallback, int n)
 {
@@ -314,69 +285,13 @@ void getenv_fb(char *dest, char *name, char *fallback, int n)
 	}
 }
 
-void list_insert(List *list, char *text, int n)
-{
-	List *tmp = malloc(sizeof(List));
-	strncpy(tmp->text, text, n);
-	tmp->next = list->next;
-	list->next = tmp;
-}
-
-void list_free(List *list)
-{
-	for (List *p = list->next, *tmp; p; tmp = p->next, free(p), p = tmp) ;
-	list->next = NULL;
-}
-
-void prepare_envvars()
-{
-	getenv_fb(PATH, "PATH", NULL, LLEN);
-	getenv_fb(HOME, "HOME", NULL, SLEN);
-	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
-	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
-	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
-	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
-	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
-
-	/* NOTE: the string in the second argument will be modified, do not use again */
-	split_env(&path_list, PATH);
-	split_env(&data_dirs_list, DATA_DIRS);
-	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
-}
-
-void set_icon_theme()
-{
-	int res;
-	char gtk3_settings[MLEN] = {0}, *real_path;
-
-	if (option.icon_theme && strlen(option.icon_theme) > 0)
-		return;
-	option.icon_theme = FALLBACK_ICON_THEME;
-
-	/* Check gtk3 settings.ini file and overwrite default icon theme */
-	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
-	if (access(gtk3_settings, F_OK) == 0) {
-		real_path = realpath(gtk3_settings, NULL);
-		if ((res = ini_parse(real_path, set_icon_theme_handler, NULL)) < 0)
-			fprintf(stderr, "failed parse gtk settings\n");
-		free(real_path);
-	}
-}
-
-int set_icon_theme_handler(void *user, const char *section, const char *name, const char *value)
-{
-	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
-		strcpy(FALLBACK_ICON_THEME, value);
-	return 1;
-}
-
 /*
  * handler for ini_parse
  * match subdirectories in an icon theme folder by parsing an index.theme file
  * - the icon size is options.icon_size
  * - the icon theme will be specified as the parsed the index.theme file
  */
-int collect_icon_subdir(void *user, const char *section, const char *name, const char *value)
+int handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value)
 {
 	/* static variables to preserve between function calls */
 	static char subdir[32], type[16];
@@ -431,6 +346,93 @@ int collect_icon_subdir(void *user, const char *section, const char *name, const
 	return 1;
 }
 
+/* Handler for ini_parse, parse app info and save in App variable pointed by *user */
+int handler_parse_app(void *user, const char *section, const char *name, const char *value)
+{
+	App *app = (App *)user;
+	if (strcmp(section, "Desktop Entry") == 0) {
+		if (strcmp(name, "Exec") == 0)
+			strcpy(app->exec, value);
+		else if (strcmp(name, "Icon") == 0)
+			strcpy(app->icon, value);
+		else if (strcmp(name, "Name") == 0)
+			strcpy(app->name, value);
+		else if (strcmp(name, "Terminal") == 0)
+			app->terminal = strcmp(value, "true") == 0;
+		else if (strcmp(name, "GenericName") == 0)
+			strcpy(app->genericname, value);
+		else if (strcmp(name, "Categories") == 0)
+			strcpy(app->categories, value);
+		else if (strcmp(name, "Path") == 0)
+			strcpy(app->path, value);
+
+		if ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
+			|| (strcmp(name, "Type") == 0 && strcmp(value, "Application") != 0)
+			|| (strcmp(name, "TryExec") == 0 && check_exec(value) == 0)
+			|| (strcmp(name, "NotShowIn") == 0 && check_desktop(value))
+			|| (strcmp(name, "OnlyShowIn") == 0 && !check_desktop(value)))
+			app->not_show = 1;
+	}
+	return 1;
+}
+
+int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value)
+{
+	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
+		strcpy(FALLBACK_ICON_THEME, value);
+	return 1;
+}
+
+void list_free(List *list)
+{
+	for (List *p = list->next, *tmp; p; tmp = p->next, free(p), p = tmp) ;
+	list->next = NULL;
+}
+
+void list_insert(List *list, char *text, int n)
+{
+	List *tmp = malloc(sizeof(List));
+	strncpy(tmp->text, text, n);
+	tmp->next = list->next;
+	list->next = tmp;
+}
+
+void prepare_envvars()
+{
+	getenv_fb(PATH, "PATH", NULL, LLEN);
+	getenv_fb(HOME, "HOME", NULL, SLEN);
+	getenv_fb(XDG_DATA_HOME, "XDG_DATA_HOME", ".local/share", SLEN);
+	getenv_fb(XDG_DATA_DIRS, "XDG_DATA_DIRS", "/usr/share:/usr/local/share", LLEN);
+	getenv_fb(XDG_CONFIG_HOME, "XDG_CONFIG_HOME", ".config", SLEN);
+	getenv_fb(XDG_CURRENT_DESKTOP, "XDG_CURRENT_DESKTOP", NULL, SLEN);
+	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
+
+	/* NOTE: the string in the second argument will be modified, do not use again */
+	split_env(&path_list, PATH);
+	split_env(&data_dirs_list, DATA_DIRS);
+	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+}
+
+void set_icon_theme()
+{
+	int res;
+	char gtk3_settings[MLEN] = {0}, *real_path;
+
+	if (option.icon_theme && strlen(option.icon_theme) > 0)
+		return;
+	option.icon_theme = FALLBACK_ICON_THEME;
+
+	/* Check gtk3 settings.ini file and overwrite default icon theme */
+	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
+	if (access(gtk3_settings, F_OK) == 0) {
+		real_path = realpath(gtk3_settings, NULL);
+		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) < 0)
+			fprintf(stderr, "failed parse gtk settings\n");
+		free(real_path);
+	}
+}
+
 void show_xdg_menu(int fd)
 {
 	int res;
@@ -452,7 +454,7 @@ void show_xdg_menu(int fd)
 			app = calloc(sizeof(App), 1);
 			sprintf(path, "%s/%s", folder, entry->d_name);
 			strcpy(app->entry_path, path);
-			if ((res = ini_parse(path, get_app, app)) < 0)
+			if ((res = ini_parse(path, handler_parse_app, app)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
 
 			if (!app->not_show) {
@@ -552,13 +554,11 @@ int main(int argc, char *argv[])
 
 		waitpid(s.pid, NULL, 0);
 		if (read(s.readfd, line, LLEN) > 0) {
-			if (option.dry_run) {
-				printf("%s", line);
-			} else {
-				*strchr(line, '\n') = 0;
-				strcat(line, " &");
-				system(line);
-			}
+			*strchr(line, '\n') = 0;
+			if (option.dry_run)
+				puts(line);
+			else
+				system(strcat(line, " &"));
 		}
 		close(s.readfd);
 	}
