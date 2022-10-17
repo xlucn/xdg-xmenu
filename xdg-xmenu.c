@@ -563,5 +563,6 @@ int main(int argc, char *argv[])
 		close(s.readfd);
 	}
 
+	clean_up();
 	return 0;
 }
