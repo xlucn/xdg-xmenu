@@ -312,15 +312,8 @@ void list_insert(List *list, char *text, int n)
 
 void list_free(List *list)
 {
-	List *p, *tmp;
-
-	p = list->next;
+	for (List *p = list->next, *tmp; p; tmp = p->next, free(p), p = tmp) ;
 	list->next = NULL;
-	while (p) {
-		tmp = p->next;
-		free(p);
-		p = tmp;
-	}
 }
 
 int set_icon_theme()
