@@ -22,6 +22,17 @@
 /* for simple names or directories */
 #define SLEN 128
 
+#define LIST_FREE(L, TYPE) \
+	for (TYPE *p = (L)->next, *tmp; p; tmp = p->next, free(p), p = tmp) ; \
+	(L)->next = NULL;
+
+#define LIST_INSERT(L, TEXT, N) { \
+	List *tmp = malloc(sizeof(List)); \
+	strncpy(tmp->text, TEXT, N); \
+	tmp->next = (L)->next; \
+	(L)->next = tmp; \
+}
+
 struct Option {
 	char *fallback_icon;
 	char *icon_theme;
@@ -146,8 +157,6 @@ void getenv_fb(char *dest, char *name, char *fallback, int n);
 int handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value);
 int handler_parse_app(void *user, const char *section, const char *name, const char *value);
 int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
-void list_free(List *list);
-void list_insert(List *list, char *text, int n);
 void prepare_envvars();
 void set_icon_theme();
 void show_xdg_menu();
@@ -180,10 +189,10 @@ int check_exec(const char *cmd)
 
 void clean_up()
 {
-	list_free(&icon_dirs);
-	list_free(&path_list);
-	list_free(&data_dirs_list);
-	list_free(&current_desktop_list);
+	LIST_FREE(&icon_dirs, List);
+	LIST_FREE(&path_list, List);
+	LIST_FREE(&data_dirs_list, List);
+	LIST_FREE(&current_desktop_list, List);
 }
 
 void find_icon(char *icon_path, char *icon_name)
@@ -228,7 +237,7 @@ void find_icon_dirs()
 		}
 	}
 
-	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
+	LIST_INSERT(&icon_dirs, "/usr/share/pixmaps", SLEN);
 }
 
 void gen_entry(App *app)
@@ -312,7 +321,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 					&& minsize <= option.icon_size
 					&& maxsize >= option.icon_size)))
 			/* save dirs into this linked list */
-			list_insert(dirs, subdir, SLEN);
+			LIST_INSERT(dirs, subdir, SLEN);
 
 		/* reset the current section */
 		strncpy(subdir, section, 32);
@@ -382,20 +391,6 @@ int handler_set_icon_theme(void *user, const char *section, const char *name, co
 	if (strcmp(section, "Settings") == 0 && strcmp(name, "gtk-icon-theme-name") == 0)
 		strcpy(FALLBACK_ICON_THEME, value);
 	return 1;
-}
-
-void list_free(List *list)
-{
-	for (List *p = list->next, *tmp; p; tmp = p->next, free(p), p = tmp) ;
-	list->next = NULL;
-}
-
-void list_insert(List *list, char *text, int n)
-{
-	List *tmp = malloc(sizeof(List));
-	strncpy(tmp->text, text, n);
-	tmp->next = list->next;
-	list->next = tmp;
 }
 
 void prepare_envvars()
