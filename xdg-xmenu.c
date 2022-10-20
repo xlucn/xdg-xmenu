@@ -22,6 +22,8 @@
 /* for simple names or directories */
 #define SLEN 128
 
+#define LEN(X) (sizeof(X) / sizeof(X[0]))
+
 #define LIST_FREE(L, TYPE) \
 	for (TYPE *p = (L)->next, *tmp; p; tmp = p->next, free(p), p = tmp) ; \
 	(L)->next = NULL;
@@ -55,7 +57,7 @@ struct Option {
 
 typedef struct App {
 	/* from desktop entry file */
-	char categories[LLEN];
+	char category[SLEN];
 	char exec[MLEN];
 	char genericname[SLEN];
 	char icon[SLEN];
@@ -81,41 +83,41 @@ typedef struct spawn_t {
 } spawn_t;
 
 struct Category2Name {
-	char *catetory;
+	char *category;
 	char *name;
 } xdg_categories[] = {
-	{"AudioVideo", "Multimedia"},
 	{"Audio", "Multimedia"},
-	{"Video", "Multimedia"},
+	{"AudioVideo", "Multimedia"},
 	{"Development", "Development"},
 	{"Education", "Education"},
 	{"Game", "Games"},
 	{"Graphics", "Graphics"},
 	{"Network", "Internet"},
 	{"Office", "Office"},
+	{"Others", "Others"},
 	{"Science", "Science"},
 	{"Settings", "Settings"},
 	{"System", "System"},
 	{"Utility", "Accessories"},
-	{"Others", "Others"}
+	{"Video", "Multimedia"}
 };
 
 struct Name2Icon {
 	char *category;
 	char *icon;
 } category_icons[] = {
-	{"Multimedia", "applications-multimedia"},
+	{"Accessories", "applications-accessories"},
 	{"Development", "applications-development"},
 	{"Education", "applications-education"},
 	{"Games", "applications-games"},
 	{"Graphics", "applications-graphics"},
 	{"Internet", "applications-internet"},
+	{"Multimedia", "applications-multimedia"},
 	{"Office", "applications-office"},
+	{"Others", "applications-other"},
 	{"Science", "applications-science"},
 	{"Settings", "preferences-desktop"},
-	{"System", "applications-system"},
-	{"Accessories", "applications-accessories"},
-	{"Others", "applications-other"}
+	{"System", "applications-system"}
 };
 
 const char *usage_str =
@@ -150,6 +152,7 @@ App all_apps;
 int check_desktop(const char *desktop_list);
 int check_exec(const char *cmd);
 void clean_up();
+void extract_main_category(char *category, const char *categories);
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
 void gen_entry(App *app);
@@ -193,6 +196,19 @@ void clean_up()
 	LIST_FREE(&path_list, List);
 	LIST_FREE(&data_dirs_list, List);
 	LIST_FREE(&current_desktop_list, List);
+}
+
+void extract_main_category(char *category, const char *categories)
+{
+	List list_categories = {0}, *s;
+
+	split_to_list(&list_categories, categories, ";");
+	for (s = list_categories.next; s; s = s->next)
+		for (int i = 0; i < LEN(xdg_categories); i++)
+			if (strcmp(xdg_categories[i].category, s->text) == 0)
+				strcpy(category, xdg_categories[i].name);
+
+	LIST_FREE(&list_categories, List);
 }
 
 void find_icon(char *icon_path, char *icon_name)
@@ -371,7 +387,7 @@ int handler_parse_app(void *user, const char *section, const char *name, const c
 		else if (strcmp(name, "GenericName") == 0)
 			strcpy(app->genericname, value);
 		else if (strcmp(name, "Categories") == 0)
-			strcpy(app->categories, value);
+			extract_main_category(app->category, value);
 		else if (strcmp(name, "Path") == 0)
 			strcpy(app->path, value);
 
