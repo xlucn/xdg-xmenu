@@ -161,7 +161,7 @@ void prepare_envvars();
 void set_icon_theme();
 void show_xdg_menu();
 spawn_t spawn(const char *cmd, char *const argv[]);
-void split_env(List *list, char *env_string);
+void split_to_list(List *list, const char *env_string, char *sep);
 
 int check_desktop(const char *desktop_list) {
 	for (List *desktop = current_desktop_list.next; desktop; desktop = desktop->next)
@@ -404,9 +404,9 @@ void prepare_envvars()
 	snprintf(DATA_DIRS, LLEN + MLEN, "%s:%s", XDG_DATA_DIRS, XDG_DATA_HOME);
 
 	/* NOTE: the string in the second argument will be modified, do not use again */
-	split_env(&path_list, PATH);
-	split_env(&data_dirs_list, DATA_DIRS);
-	split_env(&current_desktop_list, XDG_CURRENT_DESKTOP);
+	split_to_list(&path_list, PATH, ":");
+	split_to_list(&data_dirs_list, DATA_DIRS, ":");
+	split_to_list(&current_desktop_list, XDG_CURRENT_DESKTOP, ":");
 }
 
 void set_icon_theme()
@@ -501,16 +501,19 @@ spawn_t spawn(const char *cmd, char *const argv[])
 	return status;
 }
 
-void split_env(List *list, char *env_string)
+void split_to_list(List *list, const char *env_string, char *sep)
 {
+	char *buffer = strdup(env_string);
 	List *tmp;
 
-	for (char *p = strtok(env_string, ":"); p; p = strtok(NULL, ":")) {
-		tmp = (List *)malloc(sizeof(List));
+	for (char *p = strtok(buffer, sep); p; p = strtok(NULL, sep)) {
+		tmp = malloc(sizeof(List));
 		strncpy(tmp->text, p, SLEN);
 		tmp->next = list->next;
 		list->next = tmp;
 	}
+
+	free(buffer);
 }
 
 int main(int argc, char *argv[])
