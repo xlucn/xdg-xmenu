@@ -46,7 +46,6 @@ struct Option {
 	int no_genname;
 	int no_icon;
 	int scale;
-	int xdg_de;
 } option = {
 	.fallback_icon = "application-x-executable",
 	.icon_size = 24,
@@ -127,7 +126,6 @@ const char *usage_str =
 	"  -h          Show this help message and exit\n"
 	"  -b ICON     Fallback icon name, default is application-x-executable\n"
 	"  -d          Dump generated menu, do not run xmenu\n"
-	"  -e          Show apps according to desktop environments\n"
 	"  -G          Do not show generic name of the app\n"
 	"  -i THEME    Icon theme for app icons. Default to gtk3 settings\n"
 	"  -I          Disable icon in xmenu\n"
@@ -537,11 +535,10 @@ int main(int argc, char *argv[])
 	int opt;
 	char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
 
-	while ((opt = getopt(argc, argv, "b:deGhi:Ins:S:t:x:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:dGhi:Ins:S:t:x:")) != -1) {
 		switch (opt) {
 			case 'b': option.fallback_icon = optarg; break;
 			case 'd': option.dump = 1; break;
-			case 'e': option.xdg_de = 1; break;
 			case 'G': option.no_genname = 1; break;
 			case 'i': option.icon_theme = optarg; break;
 			case 'I': option.no_icon = 1; break;
