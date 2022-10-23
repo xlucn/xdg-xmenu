@@ -212,6 +212,13 @@ void find_icon(char *icon_path, char *icon_name)
 	char test_path[MLEN];
 	static const char *exts[] = {"svg", "png", "xpm"};
 
+	/* provided icon is a file path */
+	if (icon_name[0] == '/') {
+		if (access(icon_name, F_OK) == 0)
+			strncpy(icon_path, icon_name, MLEN);
+		return;
+	}
+
 	for (List *dir = icon_dirs.next; dir; dir = dir->next) {
 		for (int i = 0; i < 3; i++) {
 			snprintf(test_path, MLEN, "%s/%s.%s", dir->text, icon_name, exts[i]);
