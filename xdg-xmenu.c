@@ -275,16 +275,17 @@ void gen_entry(App *app)
 		}
 	}
 
-	find_icon(icon_path, app->icon);
 	if (!option.no_genname && strlen(app->genericname) > 0)
 		sprintf(name, "%s (%s)", app->name, app->genericname);
 	else
 		strcpy(name, app->name);
 
-	if (option.no_icon)
+	if (option.no_icon) {
 		sprintf(app->xmenu_entry, "\t%s\t%s\n", name, command);
-	else
+	} else {
+		find_icon(icon_path, app->icon);
 		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
+	}
 }
 
 /* getenv with fallback value */
@@ -542,8 +543,10 @@ int main(int argc, char *argv[])
 
 	prepare_envvars();
 	set_icon_theme();
-	find_icon_dirs();
-	find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
+	if (!option.no_icon) {
+		find_icon_dirs();
+		find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
+	}
 
 	if (option.dump) {
 		show_xdg_menu(0);
