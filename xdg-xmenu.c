@@ -145,6 +145,7 @@ int check_desktop(const char *desktop_list);
 int check_exec(const char *cmd);
 void clean_up_lists();
 void extract_main_category(char *category, const char *categories);
+void find_all_apps();
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
 void gen_entry(App *app);
@@ -153,9 +154,10 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 int handler_parse_app(void *user, const char *section, const char *name, const char *value);
 int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
 void prepare_envvars();
+void print_menu(FILE *fp);
+void run_xmenu();
 void set_icon_theme();
-void show_xdg_menu();
-int spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
+int  spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
 
 int check_desktop(const char *desktop_list) {
@@ -281,10 +283,10 @@ void gen_entry(App *app)
 		strcpy(name, app->name);
 
 	if (option.no_icon) {
-		sprintf(app->xmenu_entry, "\t%s\t%s\n", name, command);
+		sprintf(app->xmenu_entry, "\t%s\t%s", name, command);
 	} else {
 		find_icon(icon_path, app->icon);
-		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s\n", icon_path, name, command);
+		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s", icon_path, name, command);
 	}
 }
 
@@ -437,7 +439,7 @@ void set_icon_theme()
 	}
 }
 
-void show_xdg_menu(int fd)
+void find_all_apps()
 {
 	int res;
 	char folder[MLEN] = {0}, path[LLEN] = {0};
@@ -465,14 +467,16 @@ void show_xdg_menu(int fd)
 				app->next = all_apps.next;
 				all_apps.next = app;
 				gen_entry(app);
-				if (option.dump)
-					printf("%s", app->xmenu_entry);
-				else
-					write(fd, app->xmenu_entry, strlen(app->xmenu_entry));
 			}
 		}
 		closedir(dir);
 	}
+}
+
+void print_menu(FILE *fp)
+{
+	for (App* app = all_apps.next; app; app = app->next)
+		fprintf(fp, "%s\n", app->xmenu_entry);
 }
 
 /*
@@ -520,10 +524,31 @@ void split_to_list(List *list, const char *env_string, char *sep)
 	free(buffer);
 }
 
+void run_xmenu()
+{
+	int pid, fd_input, fd_output;
+	char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
+	FILE *fp;
+
+	pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
+	fp = fdopen(fd_input, "w");
+	print_menu(fp);
+	fclose(fp);
+
+	waitpid(pid, NULL, 0);
+	if (read(fd_output, line, LLEN) > 0) {
+		*strchr(line, '\n') = 0;
+		if (option.dry_run)
+			puts(line);
+		else
+			system(strcat(line, " &"));
+	}
+	close(fd_output);
+}
+
 int main(int argc, char *argv[])
 {
 	int opt;
-	char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
 
 	while ((opt = getopt(argc, argv, "b:dGhi:Ins:S:t:x:")) != -1) {
 		switch (opt) {
@@ -547,26 +572,13 @@ int main(int argc, char *argv[])
 		find_icon_dirs();
 		find_icon(FALLBACK_ICON_PATH, option.fallback_icon);
 	}
+	find_all_apps();
 
-	if (option.dump) {
-		show_xdg_menu(0);
-	} else {
-		int pid, fd_input, fd_output;
-		pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
+	if (option.dump)
+		print_menu(stdout);
+	else
+		run_xmenu();
 
-		show_xdg_menu(fd_input);
-		close(fd_input);
-
-		waitpid(pid, NULL, 0);
-		if (read(fd_output, line, LLEN) > 0) {
-			*strchr(line, '\n') = 0;
-			if (option.dry_run)
-				puts(line);
-			else
-				system(strcat(line, " &"));
-		}
-		close(fd_output);
-	}
 	clean_up_lists();
 	return 0;
 }
