@@ -75,12 +75,6 @@ typedef struct List {
 	struct List *next;
 } List;
 
-typedef struct spawn_t {
-	int readfd;
-	int writefd;
-	pid_t pid;
-} spawn_t;
-
 struct Category2Name {
 	char *category;
 	char *name;
@@ -161,7 +155,7 @@ int handler_set_icon_theme(void *user, const char *section, const char *name, co
 void prepare_envvars();
 void set_icon_theme();
 void show_xdg_menu();
-spawn_t spawn(const char *cmd, char *const argv[]);
+int spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
 
 int check_desktop(const char *desktop_list) {
@@ -486,11 +480,10 @@ void show_xdg_menu(int fd)
  * Create 2 pipes connecting cmd process with pfd_read[1] and pfd_write[0], and
  * return pfd_read[0] and pfd_write[1] back to user for read and write.
  */
-spawn_t spawn(const char *cmd, char *const argv[])
+int spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output)
 {
 	pid_t pid;
-	spawn_t status = {-1, -1, -1};
-	int pfd_read[2] = {-1, -1}, pfd_write[2] = {-1, -1};
+	int pfd_read[2], pfd_write[2];
 
 	pipe(pfd_read);
 	pipe(pfd_write);
@@ -500,19 +493,15 @@ spawn_t spawn(const char *cmd, char *const argv[])
 		dup2(pfd_write[0], 0);
 		close(pfd_read[0]);
 		close(pfd_write[1]);
-		if(execvp(cmd, argv) == -1) {
-			fprintf(stderr, "execute %s failed\n", cmd);
-			exit(1);
-		}
+		execvp(cmd, argv);
 	} else if (pid > 0) { /* in parent */
-		status.pid = pid;
-		status.readfd = pfd_read[0];
-		status.writefd = pfd_write[1];
+		*fd_output = pfd_read[0];
+		*fd_input = pfd_write[1];
 	}
 
 	close(pfd_read[1]);
 	close(pfd_write[0]);
-	return status;
+	return pid;
 }
 
 void split_to_list(List *list, const char *env_string, char *sep)
@@ -559,19 +548,21 @@ int main(int argc, char *argv[])
 	if (option.dump) {
 		show_xdg_menu(0);
 	} else {
-		spawn_t s = spawn(option.xmenu_cmd, xmenu_argv);
-		show_xdg_menu(s.writefd);
-		close(s.writefd);
+		int pid, fd_input, fd_output;
+		pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
 
-		waitpid(s.pid, NULL, 0);
-		if (read(s.readfd, line, LLEN) > 0) {
+		show_xdg_menu(fd_input);
+		close(fd_input);
+
+		waitpid(pid, NULL, 0);
+		if (read(fd_output, line, LLEN) > 0) {
 			*strchr(line, '\n') = 0;
 			if (option.dry_run)
 				puts(line);
 			else
 				system(strcat(line, " &"));
 		}
-		close(s.readfd);
+		close(fd_output);
 	}
 
 	clean_up();
