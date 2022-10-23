@@ -114,7 +114,7 @@ struct Name2Icon {
 };
 
 const char *usage_str =
-	"xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD]\n\n"
+	"xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- ...]\n\n"
 	"Generate XDG menu for xmenu.\n\n"
 	"Options:\n"
 	"  -h          Show this help message and exit\n"
@@ -127,7 +127,9 @@ const char *usage_str =
 	"  -s SIZE     Icon theme for app icons\n"
 	"  -S SCALE    Icon size scale factor, work with HiDPI screens\n"
 	"  -t TERMINAL Terminal emulator to use, default is xterm\n"
-	"  -x CMD      Xmenu command to use, default is xmenu\n";
+	"  -x CMD      Xmenu command to use, default is xmenu\n"
+	"Note:\n\tOptions after `--' are passed to xmenu\n";
+
 
 char PATH[LLEN];
 char HOME[SLEN];
@@ -155,7 +157,7 @@ int handler_parse_app(void *user, const char *section, const char *name, const c
 int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
 void prepare_envvars();
 void print_menu(FILE *fp);
-void run_xmenu();
+void run_xmenu(int argc, char *argv[]);
 void set_icon_theme();
 int  spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
@@ -524,11 +526,21 @@ void split_to_list(List *list, const char *env_string, char *sep)
 	free(buffer);
 }
 
-void run_xmenu()
+void run_xmenu(int argc, char *argv[])
 {
 	int pid, fd_input, fd_output;
-	char *xmenu_argv[] = {NULL}, line[LLEN] = {0};
+	char **xmenu_argv, line[LLEN] = {0};
 	FILE *fp;
+
+	/* construct xmenu args for exec(3).
+	 * +2 is for leading 'xmenu' and the ending NULL
+	 * if no_icon is set, add another '-i' option */
+	xmenu_argv = calloc(argc + option.no_icon ? 3 : 2, sizeof(char*));
+	xmenu_argv[0] = option.xmenu_cmd;
+	for (int i = 0; i < argc; i++)
+		xmenu_argv[i + 1] = argv[i];
+	if (option.no_icon && strcmp(option.xmenu_cmd, "xmenu") == 0)
+		xmenu_argv[argc + 1] = "-i";
 
 	pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
 	fp = fdopen(fd_input, "w");
@@ -577,7 +589,7 @@ int main(int argc, char *argv[])
 	if (option.dump)
 		print_menu(stdout);
 	else
-		run_xmenu();
+		run_xmenu(argc - optind, argv + optind);
 
 	clean_up_lists();
 	return 0;
