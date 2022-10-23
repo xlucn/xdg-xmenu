@@ -143,8 +143,8 @@ char FALLBACK_ICON_THEME[SLEN] = "hicolor";
 List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
-int check_desktop(const char *desktop_list);
-int check_exec(const char *cmd);
+int  check_desktop(const char *desktop_list);
+int  check_exec(const char *cmd);
 void clean_up_lists();
 void extract_main_category(char *category, const char *categories);
 void find_all_apps();
@@ -152,9 +152,9 @@ void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
 void gen_entry(App *app);
 void getenv_fb(char *dest, char *name, char *fallback, int n);
-int handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value);
-int handler_parse_app(void *user, const char *section, const char *name, const char *value);
-int handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
+int  handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value);
+int  handler_parse_app(void *user, const char *section, const char *name, const char *value);
+int  handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
 void prepare_envvars();
 void print_menu(FILE *fp);
 void run_xmenu(int argc, char *argv[]);
@@ -162,7 +162,8 @@ void set_icon_theme();
 int  spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
 
-int check_desktop(const char *desktop_list) {
+int check_desktop(const char *desktop_list)
+{
 	for (List *desktop = current_desktop_list.next; desktop; desktop = desktop->next)
 		if (strstr(desktop_list, desktop->text))
 			return 1;
@@ -205,6 +206,40 @@ void extract_main_category(char *category, const char *categories)
 				strcpy(category, xdg_categories[i].name);
 
 	LIST_FREE(&list_categories, List);
+}
+
+void find_all_apps()
+{
+	int res;
+	char folder[MLEN] = {0}, path[LLEN] = {0};
+	DIR *dir;
+	struct dirent *entry;
+	App *app;
+
+	/* output all app in folder */
+	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
+		sprintf(folder, "%s/applications", data_dir->text);
+		if ((dir = opendir(folder)) == NULL)
+			continue;
+
+		while ((entry = readdir(dir)) != NULL) {
+			if (strcmp(strrchr(entry->d_name, '.'), ".desktop") != 0)
+				continue;
+
+			app = calloc(1, sizeof(App));
+			sprintf(path, "%s/%s", folder, entry->d_name);
+			strcpy(app->entry_path, path);
+			if ((res = ini_parse(path, handler_parse_app, app)) < 0)
+				fprintf(stderr, "Desktop file parse failed: %d\n", res);
+
+			if (!app->not_show) {
+				app->next = all_apps.next;
+				all_apps.next = app;
+				gen_entry(app);
+			}
+		}
+		closedir(dir);
+	}
 }
 
 void find_icon(char *icon_path, char *icon_name)
@@ -429,6 +464,44 @@ void prepare_envvars()
 	split_to_list(&current_desktop_list, XDG_CURRENT_DESKTOP, ":");
 }
 
+void print_menu(FILE *fp)
+{
+	for (App* app = all_apps.next; app; app = app->next)
+		fprintf(fp, "%s\n", app->xmenu_entry);
+}
+
+void run_xmenu(int argc, char *argv[])
+{
+	int pid, fd_input, fd_output;
+	char **xmenu_argv, line[LLEN] = {0};
+	FILE *fp;
+
+	/* construct xmenu args for exec(3).
+	 * +2 is for leading 'xmenu' and the ending NULL
+	 * if no_icon is set, add another '-i' option */
+	xmenu_argv = calloc(argc + option.no_icon ? 3 : 2, sizeof(char*));
+	xmenu_argv[0] = option.xmenu_cmd;
+	for (int i = 0; i < argc; i++)
+		xmenu_argv[i + 1] = argv[i];
+	if (option.no_icon && strcmp(option.xmenu_cmd, "xmenu") == 0)
+		xmenu_argv[argc + 1] = "-i";
+
+	pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
+	fp = fdopen(fd_input, "w");
+	print_menu(fp);
+	fclose(fp);
+
+	waitpid(pid, NULL, 0);
+	if (read(fd_output, line, LLEN) > 0) {
+		*strchr(line, '\n') = 0;
+		if (option.dry_run)
+			puts(line);
+		else
+			system(strcat(line, " &"));
+	}
+	close(fd_output);
+}
+
 void set_icon_theme()
 {
 	int res;
@@ -446,46 +519,6 @@ void set_icon_theme()
 			fprintf(stderr, "failed parse gtk settings\n");
 		free(real_path);
 	}
-}
-
-void find_all_apps()
-{
-	int res;
-	char folder[MLEN] = {0}, path[LLEN] = {0};
-	DIR *dir;
-	struct dirent *entry;
-	App *app;
-
-	/* output all app in folder */
-	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
-		sprintf(folder, "%s/applications", data_dir->text);
-		if ((dir = opendir(folder)) == NULL)
-			continue;
-
-		while ((entry = readdir(dir)) != NULL) {
-			if (strcmp(strrchr(entry->d_name, '.'), ".desktop") != 0)
-				continue;
-
-			app = calloc(1, sizeof(App));
-			sprintf(path, "%s/%s", folder, entry->d_name);
-			strcpy(app->entry_path, path);
-			if ((res = ini_parse(path, handler_parse_app, app)) < 0)
-				fprintf(stderr, "Desktop file parse failed: %d\n", res);
-
-			if (!app->not_show) {
-				app->next = all_apps.next;
-				all_apps.next = app;
-				gen_entry(app);
-			}
-		}
-		closedir(dir);
-	}
-}
-
-void print_menu(FILE *fp)
-{
-	for (App* app = all_apps.next; app; app = app->next)
-		fprintf(fp, "%s\n", app->xmenu_entry);
 }
 
 /*
@@ -531,38 +564,6 @@ void split_to_list(List *list, const char *env_string, char *sep)
 	}
 
 	free(buffer);
-}
-
-void run_xmenu(int argc, char *argv[])
-{
-	int pid, fd_input, fd_output;
-	char **xmenu_argv, line[LLEN] = {0};
-	FILE *fp;
-
-	/* construct xmenu args for exec(3).
-	 * +2 is for leading 'xmenu' and the ending NULL
-	 * if no_icon is set, add another '-i' option */
-	xmenu_argv = calloc(argc + option.no_icon ? 3 : 2, sizeof(char*));
-	xmenu_argv[0] = option.xmenu_cmd;
-	for (int i = 0; i < argc; i++)
-		xmenu_argv[i + 1] = argv[i];
-	if (option.no_icon && strcmp(option.xmenu_cmd, "xmenu") == 0)
-		xmenu_argv[argc + 1] = "-i";
-
-	pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
-	fp = fdopen(fd_input, "w");
-	print_menu(fp);
-	fclose(fp);
-
-	waitpid(pid, NULL, 0);
-	if (read(fd_output, line, LLEN) > 0) {
-		*strchr(line, '\n') = 0;
-		if (option.dry_run)
-			puts(line);
-		else
-			system(strcat(line, " &"));
-	}
-	close(fd_output);
 }
 
 int main(int argc, char *argv[])
