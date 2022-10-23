@@ -30,7 +30,7 @@
 
 #define LIST_INSERT(L, TEXT, N) { \
 	List *tmp = calloc(1, sizeof(List)); \
-	strncpy(tmp->text, TEXT, N); \
+	snprintf(tmp->text, N, "%s", TEXT); \
 	tmp->next = (L)->next; \
 	(L)->next = tmp; \
 }
@@ -64,7 +64,7 @@ typedef struct App {
 	char path[MLEN];
 	int terminal;
 	/* derived attributes */
-	char entry_path[MLEN];
+	char entry_path[LLEN];
 	char xmenu_entry[LLEN];
 	int not_show;
 	struct App *next;
@@ -214,7 +214,7 @@ void extract_main_category(char *category, const char *categories)
 	for (s = list_categories.next; s; s = s->next)
 		for (int i = 0; i < LEN(xdg_categories); i++)
 			if (strcmp(xdg_categories[i].category, s->text) == 0)
-				strcpy(category, xdg_categories[i].name);
+				snprintf(category, SLEN, "%s", xdg_categories[i].name);
 
 	LIST_FREE(&list_categories, List);
 }
@@ -244,9 +244,9 @@ void find_all_apps()
 
 			if (!app->not_show) {
 				gen_entry(app);
-				strcpy(app->entry_path, path);
+				snprintf(app->entry_path, LLEN, "%s", path);
 				if (strlen(app->category) == 0)
-					strcpy(app->category, "Others");
+					snprintf(app->category, SLEN, "%s", "Others");
 				app->next = all_apps.next;
 				all_apps.next = app;
 			}
@@ -263,7 +263,7 @@ void find_icon(char *icon_path, char *icon_name)
 	/* provided icon is a file path */
 	if (icon_name[0] == '/') {
 		if (access(icon_name, F_OK) == 0)
-			strncpy(icon_path, icon_name, MLEN);
+			snprintf(icon_path, MLEN, "%s", icon_name);
 		return;
 	}
 
@@ -271,12 +271,12 @@ void find_icon(char *icon_path, char *icon_name)
 		for (int i = 0; i < 3; i++) {
 			snprintf(test_path, MLEN, "%s/%s.%s", dir->text, icon_name, exts[i]);
 			if (access(test_path, F_OK) == 0) {
-				strncpy(icon_path, test_path, MLEN);
+				snprintf(icon_path, MLEN, "%s", test_path);
 				return;
 			}
 		}
 	}
-	strncpy(icon_path, FALLBACK_ICON_PATH, MLEN);
+	snprintf(icon_path, MLEN, "%s", FALLBACK_ICON_PATH);
 }
 
 void find_icon_dirs()
@@ -309,14 +309,14 @@ void find_icon_dirs()
 
 void gen_entry(App *app)
 {
-	char *perc, field, replace_str[MLEN] = {0};
+	char *perc, field, replace_str[LLEN] = {0};
 	char icon_path[MLEN] = {0}, buffer[MLEN] = {0};
 	char name[MLEN + 4] = {0}, command[MLEN + SLEN] = {0};
 
 	if (app->terminal)
-		sprintf(command, "%s -e %s", option.terminal, app->exec);
+		snprintf(command, sizeof(command), "%s -e %s", option.terminal, app->exec);
 	else
-		strcpy(command, app->exec);
+		snprintf(command, sizeof(command), "%s", app->exec);
 
 	/* replace field codes */
 	/* search starting from right, this way the starting position stays the same */
@@ -325,18 +325,18 @@ void gen_entry(App *app)
 		if (isalpha(field)) {
 			memset(replace_str, 0, MLEN);
 			if (field == 'c')
-				strncpy(replace_str, app->entry_path, MLEN);
+				snprintf(replace_str, LLEN, "%s", app->entry_path);
 			else if (field == 'i' && strlen(app->icon) != 0)
-				snprintf(replace_str, MLEN, "--icon %s", app->icon);
+				snprintf(replace_str, LLEN, "--icon %s", app->icon);
 			else if (field == 'k')
-				strncpy(replace_str, app->name, MLEN);
-			strncpy(buffer, perc + 2, MLEN);
+				snprintf(replace_str, LLEN, "%s", app->name);
+			snprintf(buffer, MLEN, "%s", perc + 2);
 			snprintf(perc, MLEN - (perc - command), "%s%s", replace_str, buffer);
 		}
 	}
 
 	if (!option.no_genname && strlen(app->genericname) > 0)
-		sprintf(name, "%s (%s)", app->name, app->genericname);
+		snprintf(name, sizeof(name), "%s (%s)", app->name, app->genericname);
 	else
 		strcpy(name, app->name);
 
@@ -354,12 +354,12 @@ void getenv_fb(char *dest, char *name, char *fallback, int n)
 	char *env;
 
 	if ((env = getenv(name))) {
-		strncpy(dest, env, n);
+		snprintf(dest, n, "%s", env);
 	} else if (fallback) {
 		if (fallback[0] != '/')  /* relative path to $HOME */
 			snprintf(dest, n, "%s/%s", HOME, fallback);
 		else
-			strncpy(dest, fallback, n);
+			snprintf(dest, n, "%s", fallback);
 	}
 }
 
@@ -389,7 +389,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 			LIST_INSERT(&icon_dirs, subdir, SLEN);
 
 		/* reset the current section */
-		strncpy(subdir, section, 32);
+		snprintf(subdir, 32, "%s", section);
 		size = minsize = maxsize = -1;
 		threshold = 2;  /* threshold fallback value */
 		scale = 1;
@@ -414,7 +414,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 	} else if (strcmp(name, "Scale") == 0) {
 		scale = atoi(value);
 	} else if (strcmp(name, "Type") == 0) {
-		strncpy(type, value, 16);
+		snprintf(type, 16, "%s", value);
 	}
 
 	return 1;
@@ -426,19 +426,19 @@ int handler_parse_app(void *user, const char *section, const char *name, const c
 	App *app = (App *)user;
 	if (strcmp(section, "Desktop Entry") == 0) {
 		if (strcmp(name, "Exec") == 0)
-			strcpy(app->exec, value);
+			snprintf(app->exec, MLEN, "%s", value);
 		else if (strcmp(name, "Icon") == 0)
-			strcpy(app->icon, value);
+			snprintf(app->icon, SLEN, "%s", value);
 		else if (strcmp(name, "Name") == 0)
-			strcpy(app->name, value);
+			snprintf(app->name, SLEN, "%s", value);
 		else if (strcmp(name, "Terminal") == 0)
 			app->terminal = strcmp(value, "true") == 0;
 		else if (strcmp(name, "GenericName") == 0)
-			strcpy(app->genericname, value);
+			snprintf(app->genericname, SLEN, "%s", value);
 		else if (strcmp(name, "Categories") == 0)
 			extract_main_category(app->category, value);
 		else if (strcmp(name, "Path") == 0)
-			strcpy(app->path, value);
+			snprintf(app->path, MLEN, "%s", value);
 
 		if ((strcmp(name, "NoDisplay") == 0 && strcmp(value, "true") == 0)
 			|| (strcmp(name, "Hidden") == 0 && strcmp(value, "true") == 0)
