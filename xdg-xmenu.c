@@ -29,7 +29,7 @@
 	(L)->next = NULL;
 
 #define LIST_INSERT(L, TEXT, N) { \
-	List *tmp = malloc(sizeof(List)); \
+	List *tmp = calloc(1, sizeof(List)); \
 	strncpy(tmp->text, TEXT, N); \
 	tmp->next = (L)->next; \
 	(L)->next = tmp; \
@@ -172,7 +172,7 @@ int check_desktop(const char *desktop_list)
 
 int check_exec(const char *cmd)
 {
-	char file[MLEN];
+	char file[MLEN] = {0};
 	struct stat sb;
 
 	/* if command start with '/', check it directly */
@@ -228,14 +228,14 @@ void find_all_apps()
 
 			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
-			strcpy(app->entry_path, path);
-			if ((res = ini_parse(path, handler_parse_app, app)) < 0)
-				fprintf(stderr, "Desktop file parse failed: %d\n", res);
+			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
+				fprintf(stderr, "%s parse failed: %d\n", path, res);
 
 			if (!app->not_show) {
+				gen_entry(app);
+				strcpy(app->entry_path, path);
 				app->next = all_apps.next;
 				all_apps.next = app;
-				gen_entry(app);
 			}
 		}
 		closedir(dir);
@@ -244,7 +244,7 @@ void find_all_apps()
 
 void find_icon(char *icon_path, char *icon_name)
 {
-	char test_path[MLEN];
+	char test_path[MLEN] = {0};
 	static const char *exts[] = {"svg", "png", "xpm"};
 
 	/* provided icon is a file path */
@@ -274,10 +274,10 @@ void find_icon_dirs()
 	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
-			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, &icon_dirs)) < 0)
-				fprintf(stderr, "Desktop file parse failed: %d\n", res);
-			/* mannually call. a hack to process the end of file */
-			handler_icon_dirs_theme(&icon_dirs, "", NULL, NULL);
+			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
+				fprintf(stderr, "%s parse failed: %d\n", index_theme, res);
+			/* mannually call, a hack to process the end of file */
+			handler_icon_dirs_theme(NULL, "", NULL, NULL);
 		}
 
 		/* prepend dirs with parent path */
@@ -296,8 +296,9 @@ void find_icon_dirs()
 
 void gen_entry(App *app)
 {
-	char *perc, field, replace_str[MLEN];
-	char icon_path[MLEN], name[MLEN + 4], command[MLEN + SLEN], buffer[MLEN];
+	char *perc, field, replace_str[MLEN] = {0};
+	char icon_path[MLEN] = {0}, buffer[MLEN] = {0};
+	char name[MLEN + 4] = {0}, command[MLEN + SLEN] = {0};
 
 	if (app->terminal)
 		sprintf(command, "%s -e %s", option.terminal, app->exec);
@@ -361,11 +362,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 	static char subdir[32], type[16];
 	static int size, minsize, maxsize, threshold, scale;
 
-	List *dirs = (List *)user;
-	while (dirs->next != NULL)
-		dirs = dirs->next;
-
-	if (strcmp(section, subdir) != 0 || (!name && !value)) {
+	if ((!name && !value) || strcmp(section, subdir) != 0) {
 		/* Check the icon size after finished parsing a section */
 		if (scale == option.scale
 			&& (((strcmp(type, "Threshold") == 0 || strlen(type) == 0)
@@ -376,7 +373,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 					&& minsize <= option.icon_size
 					&& maxsize >= option.icon_size)))
 			/* save dirs into this linked list */
-			LIST_INSERT(dirs, subdir, SLEN);
+			LIST_INSERT(&icon_dirs, subdir, SLEN);
 
 		/* reset the current section */
 		strncpy(subdir, section, 32);
@@ -515,8 +512,8 @@ void set_icon_theme()
 	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
-		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) < 0)
-			fprintf(stderr, "failed parse gtk settings\n");
+		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) > 0)
+			fprintf(stderr, "failed parse gtk settings: line %d\n", res);
 		free(real_path);
 	}
 }
@@ -554,15 +551,9 @@ int spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output)
 void split_to_list(List *list, const char *env_string, char *sep)
 {
 	char *buffer = strdup(env_string);
-	List *tmp;
 
-	for (char *p = strtok(buffer, sep); p; p = strtok(NULL, sep)) {
-		tmp = malloc(sizeof(List));
-		strncpy(tmp->text, p, SLEN);
-		tmp->next = list->next;
-		list->next = tmp;
-	}
-
+	for (char *p = strtok(buffer, sep); p; p = strtok(NULL, sep))
+		LIST_INSERT(list, p, SLEN);
 	free(buffer);
 }
 
