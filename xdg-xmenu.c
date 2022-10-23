@@ -143,6 +143,7 @@ char FALLBACK_ICON_THEME[SLEN] = "hicolor";
 List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
+int  compare_app(const void *p1, const void *p2);
 int  check_desktop(const char *desktop_list);
 int  check_exec(const char *cmd);
 void clean_up_lists();
@@ -161,6 +162,16 @@ void run_xmenu(int argc, char *argv[]);
 void set_icon_theme();
 int  spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
+
+int compare_app(const void *p1, const void *p2)
+{
+	int cmp_category, cmp_name;
+	App *a1 = *(App **)p1, *a2 = *(App **)p2;
+
+	cmp_category = strcmp(a1->category, a2->category);
+	cmp_name = strcasecmp(a1->name, a2->name);
+	return cmp_category ? cmp_category : cmp_name;
+}
 
 int check_desktop(const char *desktop_list)
 {
@@ -234,6 +245,8 @@ void find_all_apps()
 			if (!app->not_show) {
 				gen_entry(app);
 				strcpy(app->entry_path, path);
+				if (strlen(app->category) == 0)
+					strcpy(app->category, "Others");
 				app->next = all_apps.next;
 				all_apps.next = app;
 			}
@@ -463,8 +476,37 @@ void prepare_envvars()
 
 void print_menu(FILE *fp)
 {
-	for (App* app = all_apps.next; app; app = app->next)
+	int i, count;
+	char icon_path[MLEN] = {0}, *curcat = NULL;
+	App **app_array, *app;
+
+	/* construct an array of apps from the linked list */
+	for (count = 0, app = all_apps.next; app; count++, app = app->next)
+		; /* count the apps */
+	app_array = calloc(count + 1, sizeof(App *));
+	for (i = 0, app = all_apps.next; app; i++, app = app->next)
+		app_array[i] = app;
+
+	qsort(app_array, count, sizeof(App *), compare_app);
+	for (i = 0; i < count; i++) {
+		app = app_array[i];
+		if (!curcat || strcmp(curcat, app->category)) {
+			curcat = app->category;
+			if (option.no_icon) {
+				fprintf(fp, "%s\n", curcat);
+			} else {
+				for (int j = 0; j < LEN(category_icons); j++)
+					if (strcmp(app->category, category_icons[j].category) == 0) {
+						find_icon(icon_path, category_icons[j].icon);
+						break;
+					}
+				fprintf(fp, "IMG:%s\t%s\n", icon_path, curcat);
+			}
+		}
 		fprintf(fp, "%s\n", app->xmenu_entry);
+	}
+	LIST_FREE(&all_apps, App);
+	free(app_array);
 }
 
 void run_xmenu(int argc, char *argv[])
