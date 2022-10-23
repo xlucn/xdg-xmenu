@@ -143,7 +143,7 @@ App all_apps;
 
 int check_desktop(const char *desktop_list);
 int check_exec(const char *cmd);
-void clean_up();
+void clean_up_lists();
 void extract_main_category(char *category, const char *categories);
 void find_icon(char *icon_path, char *icon_name);
 void find_icon_dirs();
@@ -182,7 +182,7 @@ int check_exec(const char *cmd)
 	return 0;
 }
 
-void clean_up()
+void clean_up_lists()
 {
 	LIST_FREE(&icon_dirs, List);
 	LIST_FREE(&path_list, List);
@@ -225,8 +225,8 @@ void find_icon_dirs()
 	int res, len_parent;
 	char dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
 
-	for (List *data_dir = data_dirs_list.next; data_dir; data_dir = data_dir->next) {
-		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", data_dir->text, option.icon_theme);
+	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
+		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
 			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, &icon_dirs)) < 0)
 				fprintf(stderr, "Desktop file parse failed: %d\n", res);
@@ -235,12 +235,12 @@ void find_icon_dirs()
 		}
 
 		/* prepend dirs with parent path */
-		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", data_dir->text, option.icon_theme);
-		for (List *dir = icon_dirs.next; dir; dir = dir->next) {
+		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir->text, option.icon_theme);
+		for (List *idir = icon_dirs.next; idir; idir = idir->next) {
 			/* FIXME: This is hacky, change this */
-			if (dir->text[0] != '/') {
-				strncpy(dir->text + len_parent, dir->text, strlen(dir->text));
-				memcpy(dir->text, dir_parent, strlen(dir_parent));
+			if (idir->text[0] != '/') {
+				strncpy(idir->text + len_parent, idir->text, strlen(idir->text));
+				memcpy(idir->text, dir_parent, strlen(dir_parent));
 			}
 		}
 	}
@@ -455,7 +455,7 @@ void show_xdg_menu(int fd)
 			if (strcmp(strrchr(entry->d_name, '.'), ".desktop") != 0)
 				continue;
 
-			app = calloc(sizeof(App), 1);
+			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
 			strcpy(app->entry_path, path);
 			if ((res = ini_parse(path, handler_parse_app, app)) < 0)
@@ -567,7 +567,6 @@ int main(int argc, char *argv[])
 		}
 		close(fd_output);
 	}
-
-	clean_up();
+	clean_up_lists();
 	return 0;
 }
