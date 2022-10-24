@@ -1,0 +1,126 @@
+.TH XDG-XMENU 1 "Oct 2022"
+
+.SH NAME
+xdg-xmenu - generate desktop menu file for
+.IR xmenu (1)
+
+.SH SYNOPSIS
+.B xdg-xmenu
+.RB [ -dGIn ]
+.RB [ -b
+.IR fallback_icon ]
+.RB [ -i
+.IR icon_theme ]
+.RB [ -s
+.IR icon_size ]
+.RB [ -S
+.IR scale ]
+.RB [ -t
+.IR terminal ]
+.RB [ -x
+.IR xmenu_cmd ]
+.RB [ --
+.IR <xmenu_options> ]
+
+.SH DESCRIPTION
+xdg-xmenu is a small program that shows an app menu using
+.IR xmenu (1).
+
+.SH OPTIONS
+.TP
+.BI -b " fallback_icon"
+Fallback icon in case one can not be found.
+Both an icon name and a file path is acceptable.
+Default is application-x-executable.
+.TP
+.B -d
+Print the menu to stdout, do not run xmenu command.
+.TP
+.B -G
+Do not show app's generic name.
+.TP
+.BI -i " icon_theme"
+Icon theme. Default is parsed from gtk3 configuration file. If the file is not
+found, use "hicolor" as final fallback value;
+.TP
+.B -I
+Disable icons in xmenu. This implies an '-i' option passed to xmenu.
+According to
+.IR xmenu (1),
+when not using icons, this option can make it loading even faster.
+.TP
+.B -n
+Dry run mode. Do not run the selected app. Instead, the selection will be
+printed to stdout, as in vanilla xmenu.
+.TP
+.BI -s " icon_size"
+Icon size. This is used for searching for icon files. It's not xmenu's display
+size. Default is 24.
+.TP
+.BI -S " scale"
+Scale of icons. Useful in HiDPI screens. For example, 24x24@2x icons looks like
+24x24 icons, but sharper. While 48x48 icons might have more details, because
+they are designed with larger display size in mind.
+.TP
+.BI -t " terminal"
+Terminal emulator to use. Default is xterm.
+.TP
+.BI -x " xmenu_cmd"
+Alternative xmenu command to use, default is xmenu. This is only the
+executable, extra command should be passed after `--', see below.
+.TP
+.B --
+Everything after `--' are passed to `xmenu_cmd' command.
+
+.SH EXAMPLES
+.P
+The -x and -- two options provides infinite possiblity, although not so useful
+for now. There is a redundant example of what is equivlant to `xdg-xmenu -I':
+.IP
+xdg-xmenu -I -x xmenu -- -i
+.P
+The command above disables both icons in xdg-xmenu and xmenu.
+
+.SH RESOURCES
+.TP
+.B Desktop Files
+The script will go through the .desktop files in the following directories:
+$XDG_DATA_DIRS/applications and $XDG_DATA_HOME/applications.
+
+This covers the cases like flatpak, where the flatpak specific app folders
+will be appended to the XDG_DATA_DIRS environment variable. So this program
+can find them, too.
+.TP
+.B Icon Files
+xdg-xmenu will find the icons in the following directories (loosely
+following the method in the freedesktop.org specification):
+$XDG_DATA_DIRS/icons, $XDG_DATA_HOME/icons.
+
+.SH HISTORY
+This program started out to be a shell script. But since the speed was quite
+slow (~500ms), the user could only export the menu file, and feed it to xmenu.
+
+Then I wrote a python version of this program. Although python itself is fast
+enough, but the startup time takes up majority of the execution time (~50ms).
+
+Finally, I decided to write a C version, even though I am not that fluent in C.
+It shouldn't be hard to do, since it mostly involves text processing and file
+searching. Finally, with about double the lines of code (SLOC), this version
+works quite well and fast. The average time is about 10ms on my machine. The
+bottleneck is now file access.
+
+.SH BUGS
+The implementation does not cover everything in the freedesktop specifications.
+For example the complicated icon search algorithm, and recursive app folder.
+So it is possible that a desktop entry is parsed incorrectly or an icon is not
+found. However in my own experience, it is better than most menu utilities.
+.P
+Report any bugs at
+.IR https://github.com/oliverlew/xdg-xmenu/issues
+
+.SH AUTHOR
+
+Lu Xu <oliver_lew at outlook dot com>
+
+.SH SEE ALSO
+.IR xmenu (1)
