@@ -6,7 +6,7 @@ PREFIX=/usr/local
 all: ${BIN}
 
 ${BIN}: ${SRC}
-	${CC} -Wall -linih ${SRC} -o ${BIN} -g
+	${CC} -o ${BIN} ${SRC} -linih
 
 install:
 	install -D -m 755 ${BIN} ${DESTDIR}${PREFIX}/bin/${BIN}

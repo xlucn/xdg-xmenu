@@ -22,6 +22,12 @@
 /* for simple names or directories */
 #define SLEN 128
 
+#ifdef DEBUG
+# define ini_msg(msg, ...) fprintf(stderr, msg, __VA_ARGS__)
+#else
+# define ini_msg(msg, ...) do {} while (0)
+#endif /* DEBUG */
+
 #define LEN(X) (sizeof(X) / sizeof(X[0]))
 
 #define LIST_FREE(L, TYPE) \
@@ -240,7 +246,7 @@ void find_all_apps()
 			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
 			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
-				fprintf(stderr, "%s parse failed: %d\n", path, res);
+				ini_msg("%s parse failed: %d\n", path, res);
 
 			if (!app->not_show) {
 				gen_entry(app);
@@ -288,7 +294,7 @@ void find_icon_dirs()
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
 			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
-				fprintf(stderr, "%s parse failed: %d\n", index_theme, res);
+				ini_msg("%s parse failed: %d\n", index_theme, res);
 			/* mannually call, a hack to process the end of file */
 			handler_icon_dirs_theme(NULL, "", NULL, NULL);
 		}
@@ -555,7 +561,7 @@ void set_icon_theme()
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
 		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) > 0)
-			fprintf(stderr, "failed parse gtk settings: line %d\n", res);
+			ini_msg("failed parse gtk settings: line %d\n", res);
 		free(real_path);
 	}
 }
