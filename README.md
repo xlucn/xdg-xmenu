@@ -9,7 +9,7 @@ For the legacy shell and python versions, see corresponding branches of this git
 ## Usage
 
 ```
-xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- ...]
+xdg-xmenu [-dGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- <xmenu_args>]
 
 Generate XDG menu for xmenu.
 
@@ -26,5 +26,5 @@ Options:
   -t TERMINAL Terminal emulator to use, default is xterm
   -x CMD      Xmenu command to use, default is xmenu
 Note:
-        Options after `--' are passed to xmenu
+  Options after `--' are passed to xmenu
 ```

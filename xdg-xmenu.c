@@ -114,7 +114,7 @@ struct Name2Icon {
 };
 
 const char *usage_str =
-	"xdg-xmenu [-deGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- ...]\n\n"
+	"xdg-xmenu [-dGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- <xmenu_args>]\n\n"
 	"Generate XDG menu for xmenu.\n\n"
 	"Options:\n"
 	"  -h          Show this help message and exit\n"
@@ -128,7 +128,7 @@ const char *usage_str =
 	"  -S SCALE    Icon size scale factor, work with HiDPI screens\n"
 	"  -t TERMINAL Terminal emulator to use, default is xterm\n"
 	"  -x CMD      Xmenu command to use, default is xmenu\n"
-	"Note:\n\tOptions after `--' are passed to xmenu\n";
+	"Note:\n  Options after `--' are passed to xmenu\n";
 
 
 char PATH[LLEN];
