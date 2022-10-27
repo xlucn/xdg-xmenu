@@ -346,12 +346,13 @@ void gen_entry(App *app)
 	else
 		strcpy(name, app->name);
 
-	if (option.no_icon) {
-		sprintf(app->xmenu_entry, "\t%s\t%s", name, command);
-	} else {
+	if (!option.no_icon)
 		find_icon(icon_path, app->icon);
+
+	if (option.no_icon || strlen(icon_path) == 0)
+		sprintf(app->xmenu_entry, "\t%s\t%s", name, command);
+	else
 		sprintf(app->xmenu_entry, "\tIMG:%s\t%s\t%s", icon_path, name, command);
-	}
 }
 
 /* getenv with fallback value */
@@ -498,16 +499,16 @@ void print_menu(FILE *fp)
 		app = app_array[i];
 		if (!curcat || strcmp(curcat, app->category)) {
 			curcat = app->category;
-			if (option.no_icon) {
-				fprintf(fp, "%s\n", curcat);
-			} else {
+			if (!option.no_icon)
 				for (int j = 0; j < LEN(category_icons); j++)
 					if (strcmp(app->category, category_icons[j].category) == 0) {
 						find_icon(icon_path, category_icons[j].icon);
 						break;
 					}
+			if (option.no_icon || strlen(icon_path) == 0)
+				fprintf(fp, "%s\n", curcat);
+			else
 				fprintf(fp, "IMG:%s\t%s\n", icon_path, curcat);
-			}
 		}
 		fprintf(fp, "%s\n", app->xmenu_entry);
 	}
