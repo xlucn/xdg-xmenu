@@ -275,8 +275,8 @@ void find_icon(char *icon_path, char *icon_name)
 
 	/* provided icon is a file path */
 	if (icon_name[0] == '/') {
-		if (access(icon_name, F_OK) == 0)
-			snprintf(icon_path, MLEN, "%s", icon_name);
+		snprintf(icon_path, MLEN, "%s", access(icon_name, F_OK) == 0 ?
+				 icon_name : FALLBACK_ICON_PATH);
 		return;
 	}
 
