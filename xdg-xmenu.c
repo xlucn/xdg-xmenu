@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <dirent.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,9 @@
 #define SLEN 128
 
 #ifdef DEBUG
-# define ini_msg(msg, ...) fprintf(stderr, msg, __VA_ARGS__)
+# define debug_msg(msg, ...) fprintf(stderr, msg, __VA_ARGS__)
 #else
-# define ini_msg(msg, ...) do {} while (0)
+# define debug_msg(msg, ...) do {} while (0)
 #endif /* DEBUG */
 
 #define LEN(X) (sizeof(X) / sizeof(X[0]))
@@ -78,6 +79,7 @@ typedef struct App {
 
 typedef struct List {
 	char text[SLEN];
+	int fd;
 	struct List *next;
 } List;
 
@@ -136,6 +138,7 @@ const char *usage_str =
 	"  -x CMD      Xmenu command to use, default is xmenu\n"
 	"Note:\n  Options after `--' are passed to xmenu\n";
 
+const char *exts[] = {"svg", "png", "xpm"};
 
 char PATH[LLEN];
 char HOME[SLEN];
@@ -206,6 +209,11 @@ int check_exec(const char *cmd)
 
 void clean_up_lists()
 {
+	for (List *dir = icon_dirs.next; dir; dir = dir->next)
+		if (dir->fd > 0) {
+			debug_msg("%d %s\n", dir->fd, dir->text);
+			close(dir->fd);
+		}
 	LIST_FREE(&icon_dirs, List);
 	LIST_FREE(&path_list, List);
 	LIST_FREE(&data_dirs_list, List);
@@ -246,7 +254,7 @@ void find_all_apps()
 			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
 			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
-				ini_msg("%s parse failed: %d\n", path, res);
+				debug_msg("%s parse failed: %d\n", path, res);
 
 			if (!app->not_show) {
 				gen_entry(app);
@@ -263,8 +271,7 @@ void find_all_apps()
 
 void find_icon(char *icon_path, char *icon_name)
 {
-	char test_path[MLEN] = {0};
-	static const char *exts[] = {"svg", "png", "xpm"};
+	char test_path[SLEN] = {0};
 
 	/* provided icon is a file path */
 	if (icon_name[0] == '/') {
@@ -275,9 +282,9 @@ void find_icon(char *icon_path, char *icon_name)
 
 	for (List *dir = icon_dirs.next; dir; dir = dir->next) {
 		for (int i = 0; i < 3; i++) {
-			snprintf(test_path, MLEN, "%s/%s.%s", dir->text, icon_name, exts[i]);
-			if (access(test_path, F_OK) == 0) {
-				snprintf(icon_path, MLEN, "%s", test_path);
+			snprintf(test_path, SLEN, "%s.%s", icon_name, exts[i]);
+			if (faccessat(dir->fd, test_path, F_OK, 0) == 0) {
+				snprintf(icon_path, MLEN, "%s/%s", dir->text, test_path);
 				return;
 			}
 		}
@@ -294,7 +301,7 @@ void find_icon_dirs()
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
 			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
-				ini_msg("%s parse failed: %d\n", index_theme, res);
+				debug_msg("%s parse failed: %d\n", index_theme, res);
 			/* mannually call, a hack to process the end of file */
 			handler_icon_dirs_theme(NULL, "", NULL, NULL);
 		}
@@ -311,6 +318,10 @@ void find_icon_dirs()
 	}
 
 	LIST_INSERT(&icon_dirs, "/usr/share/pixmaps", SLEN);
+	for (List *idir = icon_dirs.next; idir; idir = idir->next) {
+		idir->fd = open(idir->text, O_RDONLY);
+		debug_msg("%d %s\n", idir->fd, idir->text);
+	}
 }
 
 void gen_entry(App *app)
@@ -562,7 +573,7 @@ void set_icon_theme()
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
 		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) > 0)
-			ini_msg("failed parse gtk settings: line %d\n", res);
+			debug_msg("failed parse gtk settings: line %d\n", res);
 		free(real_path);
 	}
 }
