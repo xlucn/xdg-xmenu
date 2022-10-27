@@ -130,8 +130,8 @@ const char *usage_str =
 	"  -i THEME    Icon theme for app icons. Default to gtk3 settings\n"
 	"  -I          Disable icon in xmenu\n"
 	"  -n          Do not run app, output to stdout\n"
-	"  -s SIZE     Icon theme for app icons\n"
-	"  -S SCALE    Icon size scale factor, work with HiDPI screens\n"
+	"  -s SIZE     Icon size for app icons\n"
+	"  -S SCALE    Icon scale factor, useful in HiDPI screens\n"
 	"  -t TERMINAL Terminal emulator to use, default is xterm\n"
 	"  -x CMD      Xmenu command to use, default is xmenu\n"
 	"Note:\n  Options after `--' are passed to xmenu\n";

@@ -21,8 +21,8 @@ Options:
   -i THEME    Icon theme for app icons. Default to gtk3 settings
   -I          Disable icon in xmenu
   -n          Do not run app, output to stdout
-  -s SIZE     Icon theme for app icons
-  -S SCALE    Icon size scale factor, work with HiDPI screens
+  -s SIZE     Icon size for app icons
+  -S SCALE    Icon scale factor, useful in HiDPI screens
   -t TERMINAL Terminal emulator to use, default is xterm
   -x CMD      Xmenu command to use, default is xmenu
 Note:
