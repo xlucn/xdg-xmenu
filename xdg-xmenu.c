@@ -296,29 +296,32 @@ void find_icon_dirs()
 {
 	int res, len_parent;
 	char dir_parent[SLEN] = {0}, index_theme[MLEN] = {0};
+	char *icon_themes[] = {"hicolor", option.icon_theme, NULL}, **ptheme;
+	List *dir, *idir;
 
-	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
-		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
-		if (access(index_theme, F_OK) == 0) {
-			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
-				debug_msg("%s parse failed: %d\n", index_theme, res);
-			/* mannually call, a hack to process the end of file */
-			handler_icon_dirs_theme(NULL, "", NULL, NULL);
-		}
+	for (dir = data_dirs_list.next; dir; dir = dir->next)
+		for (ptheme = icon_themes; *ptheme; ptheme++) {
+			snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, *ptheme);
+			if (access(index_theme, F_OK) == 0) {
+				if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
+					debug_msg("%s parse failed: %d\n", index_theme, res);
+				/* mannually call, a hack to process the end of file */
+				handler_icon_dirs_theme(NULL, "", NULL, NULL);
+			}
 
-		/* prepend dirs with parent path */
-		len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir->text, option.icon_theme);
-		for (List *idir = icon_dirs.next; idir; idir = idir->next) {
-			/* FIXME: This is hacky, change this */
-			if (idir->text[0] != '/') {
-				strncpy(idir->text + len_parent, idir->text, strlen(idir->text));
-				memcpy(idir->text, dir_parent, strlen(dir_parent));
+			/* prepend dirs with parent path */
+			len_parent = snprintf(dir_parent, SLEN, "%s/icons/%s/", dir->text, *ptheme);
+			for (idir = icon_dirs.next; idir; idir = idir->next) {
+				/* FIXME: This is hacky, change this */
+				if (idir->text[0] != '/') {
+					strncpy(idir->text + len_parent, idir->text, strlen(idir->text));
+					memcpy(idir->text, dir_parent, strlen(dir_parent));
+				}
 			}
 		}
-	}
 
 	LIST_INSERT(&icon_dirs, "/usr/share/pixmaps", SLEN);
-	for (List *idir = icon_dirs.next; idir; idir = idir->next) {
+	for (idir = icon_dirs.next; idir; idir = idir->next) {
 		idir->fd = open(idir->text, O_RDONLY);
 		debug_msg("%d %s\n", idir->fd, idir->text);
 	}
