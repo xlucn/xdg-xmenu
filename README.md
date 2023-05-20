@@ -1,10 +1,15 @@
 # xdg-xmenu
 
-The current branch is a C rewrite of previous shell and python version of `xdg-xmenu`. It's a small program to show a apps menu with [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility. This C version can launch xmenu directly, due to a faster execution time.
+It's a small program to show a apps menu with [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility. The current branch is a C rewrite of previous shell and python version of `xdg-xmenu`. This C version can launch xmenu directly, due to a faster execution time.
 
 **Important:** Since Imlib2 1.8.0, svg icons are supported. Thus, `xdg-xmenu` assumes that you have installed Imlib2 of at least that version. As a result, unlike the shell version, the svg icons are not converted to png anymore. If you don't have the required version of Imlib2, use the shell version instead.
 
 For the legacy shell and python versions, see corresponding branches of this git repository.
+
+## Requirements
+
+- [libinih](https://github.com/benhoyt/inih), or called 'inih', to parse the desktop entry files.
+  [Available](https://repology.org/project/inih/versions) in most major distros.
 
 ## Usage
 
