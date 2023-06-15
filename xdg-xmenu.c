@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -22,12 +23,6 @@
 #define MLEN 256
 /* for simple names or directories */
 #define SLEN 128
-
-#ifdef DEBUG
-# define debug_msg(msg, ...) fprintf(stderr, msg, __VA_ARGS__)
-#else
-# define debug_msg(msg, ...) do {} while (0)
-#endif /* DEBUG */
 
 #define LEN(X) (sizeof(X) / sizeof(X[0]))
 
@@ -47,6 +42,7 @@ struct Option {
 	char *icon_theme;
 	char *terminal;
 	char *xmenu_cmd;
+	int debug;
 	int dry_run;
 	int dump;
 	int icon_size;
@@ -156,6 +152,7 @@ int  compare_app(const void *p1, const void *p2);
 int  check_desktop(const char *desktop_list);
 int  check_exec(const char *cmd);
 void clean_up_lists();
+void debug_msg(const char *msg, ...);
 void extract_main_category(char *category, const char *categories);
 void find_all_apps();
 void find_icon(char *icon_path, char *icon_name);
@@ -220,6 +217,18 @@ void clean_up_lists()
 	LIST_FREE(&current_desktop_list, List);
 }
 
+void debug_msg(const char *msg, ...)
+{	
+	if (!option.debug)
+		return;
+
+	va_list args;
+	fprintf(stderr, "DEBUG: ");
+	va_start(args, msg);
+	vfprintf(stderr, msg, args);
+	va_end(args);
+}
+
 void extract_main_category(char *category, const char *categories)
 {
 	List list_categories = {0}, *s;
@@ -253,6 +262,7 @@ void find_all_apps()
 
 			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
+			debug_msg("Parsing file: %s\n", path);
 			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
 				debug_msg("%s parse failed: %d\n", path, res);
 
@@ -283,6 +293,8 @@ void find_icon(char *icon_path, char *icon_name)
 	for (List *dir = icon_dirs.next; dir; dir = dir->next) {
 		for (int i = 0; i < 3; i++) {
 			snprintf(test_path, SLEN, "%s.%s", icon_name, exts[i]);
+			/* use faccessat, might be faster than access
+			 * the reason is that the directory's fd is already opened */
 			if (faccessat(dir->fd, test_path, F_OK, 0) == 0) {
 				snprintf(icon_path, MLEN, "%s/%s", dir->text, test_path);
 				return;
@@ -549,6 +561,7 @@ void run_xmenu(int argc, char *argv[])
 	fclose(fp);
 
 	waitpid(pid, NULL, 0);
+	/* Note: use larger buffer size (close to 4k) to get better performance */
 	if (read(fd_output, line, LLEN) > 0) {
 		*strchr(line, '\n') = 0;
 		if (option.dry_run)
@@ -621,10 +634,11 @@ int main(int argc, char *argv[])
 {
 	int opt;
 
-	while ((opt = getopt(argc, argv, "b:dGhi:Ins:S:t:x:")) != -1) {
+	while ((opt = getopt(argc, argv, "b:dDGhi:Ins:S:t:x:")) != -1) {
 		switch (opt) {
 			case 'b': option.fallback_icon = optarg; break;
 			case 'd': option.dump = 1; break;
+			case 'D': option.debug = 1; break;
 			case 'G': option.no_genname = 1; break;
 			case 'i': option.icon_theme = optarg; break;
 			case 'I': option.no_icon = 1; break;
