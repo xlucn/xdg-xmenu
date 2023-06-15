@@ -1,0 +1,2 @@
+# Empty files are invalid desktop entries, which will generate empty
+# lines in the menu. See #12

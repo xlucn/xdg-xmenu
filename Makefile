@@ -1,5 +1,6 @@
 SRC=xdg-xmenu.c
 BIN=xdg-xmenu
+TESTS=$(wildcard tests/test_*)
 
 PREFIX=/usr/local
 
@@ -19,4 +20,13 @@ uninstall:
 clean:
 	rm -f ${BIN}
 
-.PHONY: install uninstall clean
+test: ${TESTS}
+
+tests/test_*:
+	@printf "Testing %-70s" $@
+	@# modify XDG_DATA_* variables to search only the test directory
+	@XDG_DATA_DIRS= XDG_DATA_HOME=$@ ./xdg-xmenu -d > $@/output
+	@diff $@/output $@/menu && echo "\033[32mOK\033[0m" || echo "\033[31mFailed\033[0m"
+	@rm $@/output
+
+.PHONY: install uninstall clean ${TESTS}
