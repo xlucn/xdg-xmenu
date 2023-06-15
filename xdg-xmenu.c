@@ -65,6 +65,7 @@ typedef struct App {
 	char icon[SLEN];
 	char name[SLEN];
 	char path[MLEN];
+	char type[SLEN];
 	int terminal;
 	/* derived attributes */
 	char entry_path[LLEN];
@@ -149,6 +150,7 @@ List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
 int  compare_app(const void *p1, const void *p2);
+int  check_app(App *app);
 int  check_desktop(const char *desktop_list);
 int  check_exec(const char *cmd);
 void clean_up_lists();
@@ -177,6 +179,15 @@ int compare_app(const void *p1, const void *p2)
 	cmp_category = strcmp(a1->category, a2->category);
 	cmp_name = strcasecmp(a1->name, a2->name);
 	return cmp_category ? cmp_category : cmp_name;
+}
+
+int check_app(App *app)
+{
+	if (strcmp(app->type, "Application") != 0
+		|| strlen(app->exec) == 0
+		|| strlen(app->name) == 0)
+		return 0;
+	return 1;
 }
 
 int check_desktop(const char *desktop_list)
@@ -266,7 +277,7 @@ void find_all_apps()
 			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
 				debug_msg("%s parse failed: %d\n", path, res);
 
-			if (!app->not_show) {
+			if (!app->not_show && check_app(app)) {
 				gen_entry(app);
 				snprintf(app->entry_path, LLEN, "%s", path);
 				if (strlen(app->category) == 0)
@@ -457,6 +468,8 @@ int handler_parse_app(void *user, const char *section, const char *name, const c
 	if (strcmp(section, "Desktop Entry") == 0) {
 		if (strcmp(name, "Exec") == 0)
 			snprintf(app->exec, MLEN, "%s", value);
+		else if (strcmp(name, "Type") == 0)
+			snprintf(app->type, SLEN, "%s", value);
 		else if (strcmp(name, "Icon") == 0)
 			snprintf(app->icon, SLEN, "%s", value);
 		else if (strcmp(name, "Name") == 0)
