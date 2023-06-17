@@ -1,0 +1,2 @@
+IMG:tests/test_option_fallback_icon/icons/hicolor/scalable/apps/dummy-icon.png	Others
+	IMG:tests/test_option_fallback_icon/icons/hicolor/scalable/apps/dummy-icon.png	Foo	bar

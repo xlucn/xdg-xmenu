@@ -1,0 +1,6 @@
+# Wrong icon path should not appear
+[Desktop Entry]
+Type=Application
+Name=Foo
+Exec=bar
+Icon=/foo/bar/fUKniS37esDTH
