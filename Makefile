@@ -23,10 +23,18 @@ clean:
 test: ${TESTS}
 
 tests/test_*:
-	@printf "Testing %-70s" $@
-	@# modify XDG_DATA_* variables to search only the test directory
-	@XDG_DATA_DIRS= XDG_DATA_HOME=$@ ./xdg-xmenu -d > $@/output
-	@diff $@/output $@/menu && echo "\033[32mOK\033[0m" || echo "\033[31mFailed\033[0m"
-	@rm $@/output
+	printf "Testing %-70s" $@
+	# use arguments in the */args file if provided
+	[ -f $@/args ] && args=$$(cat $@/args) || true
+	# modify XDG_DATA_* variables to search only the test directory
+	XDG_DATA_DIRS= XDG_DATA_HOME=$@ ./xdg-xmenu -d -i hicolor $$args > $@/output
+	diff $@/output $@/menu && echo "\033[32mOK\033[0m" || echo "\033[31mFailed\033[0m"
+	rm -f $@/output
 
-.PHONY: install uninstall clean ${TESTS}
+.PHONY: install uninstall clean test ${TESTS}
+# learn something new everyday: use .SILENT to disable all echos
+.SILENT: ${TESTS}
+# use .ONESHELL to execute all command in one shell invocation, see $args variable
+.ONESHELL: ${TESTS}
+# use .NOTPARALLEL to force serial execution
+.NOTPARALLEL: test
