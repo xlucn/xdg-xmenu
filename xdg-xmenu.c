@@ -124,8 +124,6 @@ const char *usage_str =
 	"  -x CMD      Xmenu command to use, default is xmenu\n"
 	"Note:\n  Options after `--' are passed to xmenu\n";
 
-const char *exts[] = {"svg", "png", "xpm"};
-
 char PATH[LLEN];
 char HOME[SLEN];
 char XDG_DATA_HOME[SLEN];
@@ -138,7 +136,7 @@ char FALLBACK_ICON_THEME[SLEN] = "hicolor";
 List icon_dirs, path_list, data_dirs_list, current_desktop_list;
 App all_apps;
 
-int  compare_app(const void *p1, const void *p2);
+int  cmp_app_category_name(const void *p1, const void *p2);
 int  check_app(App *app);
 int  check_desktop(const char *desktop_list);
 int  check_exec(const char *cmd);
@@ -156,13 +154,13 @@ int  handler_set_icon_theme(void *user, const char *section, const char *name, c
 void list_free(List *list);
 void list_insert(List *l, char *text, int n);
 void prepare_envvars();
-void print_menu(FILE *fp);
-void run_xmenu(int argc, char *argv[]);
+void xmenu_dump(FILE *fp);
+void xmenu_run(int argc, char *argv[]);
 void set_icon_theme();
 int  spawn(const char *cmd, char *const argv[], int *fd_input, int *fd_output);
 void split_to_list(List *list, const char *env_string, char *sep);
 
-int compare_app(const void *p1, const void *p2)
+int cmp_app_category_name(const void *p1, const void *p2)
 {
 	int cmp_category, cmp_name;
 	App *a1 = *(App **)p1, *a2 = *(App **)p2;
@@ -267,7 +265,7 @@ void find_all_apps()
 
 			app = calloc(1, sizeof(App));
 			sprintf(path, "%s/%s", folder, entry->d_name);
-			debug_msg("Parsing file: %s\n", path);
+			debug_msg("Ini parse app entry: %s\n", path);
 			if ((res = ini_parse(path, handler_parse_app, app)) > 0)
 				debug_msg("%s parse failed: %d\n", path, res);
 
@@ -286,6 +284,7 @@ void find_all_apps()
 
 void find_icon(char *icon_path, char *icon_name)
 {
+	const char *exts[] = {"svg", "png", "xpm"};
 	char test_path[SLEN] = {0};
 
 	/* provided icon is a file path */
@@ -317,6 +316,7 @@ void find_icon_dirs()
 	for (List *dir = data_dirs_list.next; dir; dir = dir->next) {
 		snprintf(index_theme, MLEN, "%s/icons/%s/index.theme", dir->text, option.icon_theme);
 		if (access(index_theme, F_OK) == 0) {
+			debug_msg("Ini parse icon theme: %s\n", index_theme);
 			if ((res = ini_parse(index_theme, handler_icon_dirs_theme, NULL)) > 0)
 				debug_msg("%s parse failed: %d\n", index_theme, res);
 			/* mannually call, a hack to process the end of file */
@@ -533,7 +533,7 @@ void prepare_envvars()
 	split_to_list(&current_desktop_list, XDG_CURRENT_DESKTOP, ":");
 }
 
-void print_menu(FILE *fp)
+void xmenu_dump(FILE *fp)
 {
 	int i, count;
 	char icon_path[MLEN] = {0}, *curcat = NULL;
@@ -546,7 +546,7 @@ void print_menu(FILE *fp)
 	for (i = 0, app = all_apps.next; app; i++, app = app->next)
 		app_array[i] = app;
 
-	qsort(app_array, count, sizeof(App *), compare_app);
+	qsort(app_array, count, sizeof(App *), cmp_app_category_name);
 	for (i = 0; i < count; i++) {
 		app = app_array[i];
 		if (!curcat || strcmp(curcat, app->category)) {
@@ -567,7 +567,7 @@ void print_menu(FILE *fp)
 	free(app_array);
 }
 
-void run_xmenu(int argc, char *argv[])
+void xmenu_run(int argc, char *argv[])
 {
 	int pid, fd_input, fd_output;
 	char **xmenu_argv, line[LLEN] = {0};
@@ -585,7 +585,7 @@ void run_xmenu(int argc, char *argv[])
 
 	pid = spawn(option.xmenu_cmd, xmenu_argv, &fd_input, &fd_output);
 	fp = fdopen(fd_input, "w");
-	print_menu(fp);
+	xmenu_dump(fp);
 	fclose(fp);
 
 	waitpid(pid, NULL, 0);
@@ -613,6 +613,7 @@ void set_icon_theme()
 	snprintf(gtk3_settings, MLEN, "%s/gtk-3.0/settings.ini", XDG_CONFIG_HOME);
 	if (access(gtk3_settings, F_OK) == 0) {
 		real_path = realpath(gtk3_settings, NULL);
+		debug_msg("Ini parse gtk settings: %s\n", real_path);
 		if ((res = ini_parse(real_path, handler_set_icon_theme, NULL)) > 0)
 			debug_msg("failed parse gtk settings: line %d\n", res);
 		free(real_path);
@@ -688,9 +689,9 @@ int main(int argc, char *argv[])
 	find_all_apps();
 
 	if (option.dump)
-		print_menu(stdout);
+		xmenu_dump(stdout);
 	else
-		run_xmenu(argc - optind, argv + optind);
+		xmenu_run(argc - optind, argv + optind);
 
 	clean_up_lists();
 	return 0;
