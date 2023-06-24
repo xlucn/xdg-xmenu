@@ -1,32 +1,103 @@
-0.3.1
+# C version
+
+This current version of xdg-xmenu is written in C, before which there was a
+Python version and a shell version (see below for their history versions).
+The options are different between different variations, so modify your command
+after installing a new one.
+
+This C version can run really fast (e.g., about 10 to 20 ms on my machine) so
+that one can directly start xmenu with it. In contrast, a user certainly had to
+export the menu to a file first and then feed the menu to xmenu later, if he is
+using the shell version.
+
+
+v1.0.0-beta.1 2022-10-28
+
+Added:
+- Initial C version.
+
+
+======
+
+# Python version
+
+Below is the legacy Python version. Later C version will not be backward
+compatible with this in terms of cli interface. Although I will try to
+make most the options the same.
+
+The python versions are just intermediate state of this program, which I never
+introduced to anyone. I wrote the C version right after this. Please use that
+instead.
+
+
+v0.99.1 2022-09-20
 
 Fixed:
-- Now the size matching is following the freedesktop specification more
-  strictly, but still not exact, though.
-- After printing the help message, the script won't exit. Now a `-h`
-  switch is added, and the script will exit after help message.
-- A possible rare case, where a svg path in desktop entry, the saved png
-  paths might conflict if more than one svg paths have same basename. #4
+- Order of the categories.
+
+
+v0.99.0 2022-08-07
+
+Added:
+- Initial Python version.
+
+
+======
+
+# Shell version
+
+Below is the legacy shell version. Later Python and C versions will not be
+backward compatible with this in terms of cli interface. Although I will try to
+make most the options the same.
+
+
+0.4.2 2022-05-20
+
+Added:
+- Option `-G` to hide generic name. #8
+
+
+0.4.1 2022-05-07
+
+Changed:
+- Hide empty categories by default, use option `-E` to show them. #7
+
+Fixed:
+- Check for empty applications folder. #6
+
+
+0.4.0 2022-03-01
+
+Added:
+- Option `-S` to use svg icons directly with the new Imlib2 1.8.0.
+
+Fixed:
+- Threshold check logic
+
+
+0.3.1 2021-10-01
+
+Improved:
+- Better icon size matching.
+
+Fixed:
+- Won't exit after printing the help message.
+- Possible conflict of cached image file. #4
 
 
 0.3.0 2021-09-16
 
 Added:
-- `-f` option to force caching icons even if already cached. Useful when
-  switching to a new icon theme, or the icon theme get updated.
+- `-f` option to force caching icons even if already cached.
+  Useful when switching to a new icon theme, or the icon theme get updated.
 - `-n` option to skip icon caching, a.k.a. dry run mode.
 
 Changes:
-- Png and xpm icon images are not copied to cache directory anymore.
-  Their original path will be used in the generated menu.
-  This could bring some speed compromising, since the icons will be
-  searched every time.
-- Use `gtk-query-settings` command to get default icon theme, instead of
-  parsing settings.ini file of gtk3.
-  If this command is unavailable and an icon theme is not specified
-  explicitly, "Adwaita" will be used.
-- The extension (for now, svg) won't be stripped in the generated cache
-  image, i.e., icon.svg will be cached to icon.svg.png instead of icon.png.
+- Png and xpm icon images are not copied to the cache directory.
+  This could slow down things a little to search for the icons everytime.
+- Keep `.svg` for the generated image from svg->png convertion.
+- Use `gtk-query-settings` command to query gtk settings instead from file.
+  The fallback icon theme will be "Adwaita".
 
 
 0.2.0 2021-05-06
