@@ -1,8 +1,8 @@
 # xdg-xmenu
 
-It's a small program to show a apps menu with [xmenu](https://github.com/phillbush/xmenu), a simple x11 menu utility. The current branch is a C rewrite of previous shell and python version of `xdg-xmenu`. This C version can launch xmenu directly, due to a faster execution time.
+![](./xdg-xmenu.png)
 
-**Important:** Since Imlib2 1.8.0, svg icons are supported. Thus, `xdg-xmenu` assumes that you have installed Imlib2 of at least that version. As a result, unlike the shell version, the svg icons are not converted to png anymore. If you don't have the required version of Imlib2, use the shell version instead.
+It's a small program to show a apps menu with [xmenu](https://github.com/phillbush/xmenu). The current branch is a C rewrite of previous shell and python version of `xdg-xmenu`. This C version can launch xmenu directly, due to a faster execution time.
 
 For the legacy shell and python versions, see corresponding branches of this git repository.
 
@@ -14,9 +14,10 @@ For the legacy shell and python versions, see corresponding branches of this git
 ## Usage
 
 ```
-xdg-xmenu [-dGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL] [-x CMD] [-- <xmenu_args>]
+xdg-xmenu [-dGhIn] [-b ICON] [-i THEME] [-s SIZE] [-S SCALE] [-t TERMINAL]
+          [-x CMD] [-- <xmenu_args>]
 
-Generate XDG menu for xmenu.
+A simple app menu with xmenu.
 
 Options:
   -h          Show this help message and exit
@@ -31,5 +32,9 @@ Options:
   -t TERMINAL Terminal emulator to use, default is xterm
   -x CMD      Xmenu command to use, default is xmenu
 Note:
-  Options after `--' are passed to xmenu
+  Options after `--' are passed to xmenu (or CMD)
 ```
+
+## Notes
+
+**Important:** Svg icons are supported since Imlib2 1.8.0. Thus, `xdg-xmenu` assumes that you have installed Imlib2 of at least that version. As a result, unlike the shell version, the svg icons are not converted to png anymore. If you don't have the required version of Imlib2, use the shell version instead.
