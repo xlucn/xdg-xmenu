@@ -153,6 +153,7 @@ int  handler_parse_app(void *user, const char *section, const char *name, const 
 int  handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
 void list_free(List *list);
 void list_insert(List *l, char *text, int n);
+void list_reverse(List *l);
 void prepare_envvars();
 void xmenu_dump(FILE *fp);
 void xmenu_run(int argc, char *argv[]);
@@ -339,6 +340,10 @@ void find_icon_dirs()
 		idir->fd = open(idir->text, O_RDONLY);
 		debug_msg("%d %s\n", idir->fd, idir->text);
 	}
+	/* This will restore the icon directories as in index.theme file,
+	 *   which results in fewer checks of file existance (-70% in my case!).
+	 * Reason: the "apps", "category" folder will be searched earlier */
+	list_reverse(&icon_dirs);
 }
 
 void gen_entry(App *app)
@@ -515,6 +520,19 @@ void list_insert(List *list, char *text, int n)
 	snprintf(tmp->text, n, "%s", text);
 	tmp->next = list->next;
 	list->next = tmp;
+}
+
+void list_reverse(List *list)
+{
+	List *curr = list->next, *next;
+
+	list->next = NULL;
+	while (curr) {
+		next = curr->next;
+		curr->next = list->next;
+		list->next = curr;
+		curr = next;
+	}
 }
 
 void prepare_envvars()
