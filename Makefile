@@ -17,6 +17,12 @@ uninstall:
 	rm -f ${DESTDIR}${PREFIX}/bin/${BIN}
 	rm -f ${DESTDIR}${PREFIX}/share/man/man1/${BIN}.1
 
+profile:
+	${CC} -DDEBUG -Wall -o ${BIN}-prof ${SRC} -linih -g -lprofiler
+	CPUPROFILE=/tmp/${BIN}.prof CPUPROFILE_FREQUENCY=1000 ./${BIN}-prof -d > /dev/null
+	pprof --pdf ./${BIN}-prof /tmp/${BIN}.prof > prof.pdf
+	rm -f ${BIN}-prof
+
 clean:
 	rm -f ${BIN}
 

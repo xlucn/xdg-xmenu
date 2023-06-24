@@ -698,6 +698,9 @@ int main(int argc, char *argv[])
 		}
 	}
 
+#ifdef DEBUG
+	for (int i = 0; i < 1000; i++) {
+#endif
 	prepare_envvars();
 	set_icon_theme();
 	if (!option.no_icon) {
@@ -712,5 +715,8 @@ int main(int argc, char *argv[])
 		xmenu_run(argc - optind, argv + optind);
 
 	clean_up_lists();
+#ifdef DEBUG
+	}
+#endif
 	return 0;
 }
