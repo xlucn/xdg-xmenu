@@ -26,17 +26,6 @@
 
 #define LEN(X) (sizeof(X) / sizeof(X[0]))
 
-#define LIST_FREE(L, TYPE) \
-	for (TYPE *p = (L)->next, *tmp; p; tmp = p->next, free(p), p = tmp) ; \
-	(L)->next = NULL;
-
-#define LIST_INSERT(L, TEXT, N) { \
-	List *tmp = calloc(1, sizeof(List)); \
-	snprintf(tmp->text, N, "%s", TEXT); \
-	tmp->next = (L)->next; \
-	(L)->next = tmp; \
-}
-
 struct Option {
 	char *fallback_icon;
 	char *icon_theme;
@@ -164,6 +153,8 @@ void getenv_fb(char *dest, char *name, char *fallback, int n);
 int  handler_icon_dirs_theme(void *user, const char *section, const char *name, const char *value);
 int  handler_parse_app(void *user, const char *section, const char *name, const char *value);
 int  handler_set_icon_theme(void *user, const char *section, const char *name, const char *value);
+void list_free(List *list);
+void list_insert(List *l, char *text, int n);
 void prepare_envvars();
 void print_menu(FILE *fp);
 void run_xmenu(int argc, char *argv[]);
@@ -222,10 +213,13 @@ void clean_up_lists()
 			debug_msg("%d %s\n", dir->fd, dir->text);
 			close(dir->fd);
 		}
-	LIST_FREE(&icon_dirs, List);
-	LIST_FREE(&path_list, List);
-	LIST_FREE(&data_dirs_list, List);
-	LIST_FREE(&current_desktop_list, List);
+	list_free(&icon_dirs);
+	list_free(&path_list);
+	list_free(&data_dirs_list);
+	list_free(&current_desktop_list);
+	for (App *p = all_apps.next, *tmp; p; tmp = p->next, free(p), p = tmp) ;
+	all_apps.next = NULL;
+
 }
 
 void debug_msg(const char *msg, ...)
@@ -250,7 +244,7 @@ void extract_main_category(char *category, const char *categories)
 			if (strcmp(xdg_categories[i].category, s->text) == 0)
 				snprintf(category, SLEN, "%s", xdg_categories[i].name);
 
-	LIST_FREE(&list_categories, List);
+	list_free(&list_categories);
 }
 
 void find_all_apps()
@@ -340,7 +334,7 @@ void find_icon_dirs()
 		}
 	}
 
-	LIST_INSERT(&icon_dirs, "/usr/share/pixmaps", SLEN);
+	list_insert(&icon_dirs, "/usr/share/pixmaps", SLEN);
 	for (List *idir = icon_dirs.next; idir; idir = idir->next) {
 		idir->fd = open(idir->text, O_RDONLY);
 		debug_msg("%d %s\n", idir->fd, idir->text);
@@ -427,7 +421,7 @@ int handler_icon_dirs_theme(void *user, const char *section, const char *name, c
 					&& minsize <= option.icon_size
 					&& maxsize >= option.icon_size)))
 			/* save dirs into this linked list */
-			LIST_INSERT(&icon_dirs, subdir, SLEN);
+			list_insert(&icon_dirs, subdir, SLEN);
 
 		/* reset the current section */
 		snprintf(subdir, 32, "%s", section);
@@ -501,6 +495,28 @@ int handler_set_icon_theme(void *user, const char *section, const char *name, co
 	return 1;
 }
 
+void list_free(List *list)
+{
+	List *p = list->next, *tmp;
+
+	list->next = NULL;
+	while (p) {
+		tmp = p->next;
+		free(p);
+		p = tmp;
+	}
+}
+
+void list_insert(List *list, char *text, int n)
+{
+	List *tmp;
+
+	tmp = calloc(1, sizeof(List));
+	snprintf(tmp->text, n, "%s", text);
+	tmp->next = list->next;
+	list->next = tmp;
+}
+
 void prepare_envvars()
 {
 	getenv_fb(PATH, "PATH", NULL, LLEN);
@@ -548,7 +564,6 @@ void print_menu(FILE *fp)
 		}
 		fprintf(fp, "%s\n", app->xmenu_entry);
 	}
-	LIST_FREE(&all_apps, App);
 	free(app_array);
 }
 
@@ -639,7 +654,7 @@ void split_to_list(List *list, const char *env_string, char *sep)
 	char *buffer = strdup(env_string);
 
 	for (char *p = strtok(buffer, sep); p; p = strtok(NULL, sep))
-		LIST_INSERT(list, p, SLEN);
+		list_insert(list, p, SLEN);
 	free(buffer);
 }
 
