@@ -10,6 +10,13 @@ that one can directly start xmenu with it. In contrast, a user certainly had to
 export the menu to a file first and then feed the menu to xmenu later, if he is
 using the shell version.
 
+v1.0.0-beta.2 2023.07.02
+
+Changed:
+- Improve the icon search time.
+
+Fixed:
+- Check vadidation of the app's desktop file, #12
 
 v1.0.0-beta.1 2022-10-28
 
