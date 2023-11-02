@@ -249,7 +249,7 @@ void extract_main_category(char *category, const char *categories)
 void find_all_apps()
 {
 	int res;
-	char folder[MLEN] = {0}, path[LLEN] = {0};
+	char folder[MLEN] = {0}, path[LLEN] = {0}, *ext;
 	DIR *dir;
 	struct dirent *entry;
 	App *app;
@@ -261,7 +261,11 @@ void find_all_apps()
 			continue;
 
 		while ((entry = readdir(dir)) != NULL) {
-			if (strcmp(strrchr(entry->d_name, '.'), ".desktop") != 0)
+			ext = strrchr(entry->d_name, '.');
+			if ((entry->d_type != DT_REG
+					&& entry->d_type != DT_LNK
+					&& entry->d_type != DT_UNKNOWN)  /* not file */
+				|| !ext || strcmp(ext, ".desktop") != 0) /* not desktop entry */
 				continue;
 
 			app = calloc(1, sizeof(App));
